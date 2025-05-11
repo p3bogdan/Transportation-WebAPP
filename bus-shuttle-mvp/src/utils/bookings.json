@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "user": "Bogdan",
+    "email": "bogdan@yahoo.com",
+    "phone": "0722511554",
+    "routeId": "demo-route-1",
+    "pickupCity": "Cluj-Napoca",
+    "destination": "Bucharest",
+    "date": "2025-05-11",
+    "createdAt": "2025-05-11T10:00:00.000Z",
+    "company": "TransEuro"
+  },
+  {
+    "id": 2,
+    "user": "Andreea Popescu",
+    "email": "andreea.popescu@gmail.com",
+    "phone": "0733111222",
+    "routeId": "demo-route-2",
+    "pickupCity": "Timisoara",
+    "destination": "Oradea",
+    "date": "2025-05-12",
+    "createdAt": "2025-05-10T15:30:00.000Z",
+    "company": "EuroShuttle"
+  },
+  {
+    "id": 3,
+    "user": "Mihai Ionescu",
+    "email": "mihai.ionescu@yahoo.com",
+    "phone": "0744555666",
+    "routeId": "demo-route-3",
+    "pickupCity": "Brasov",
+    "destination": "Constanta",
+    "date": "2025-05-13",
+    "createdAt": "2025-05-09T09:45:00.000Z",
+    "company": "TransEuro"
+  },
+  {
+    "id": 4,
+    "user": "Elena Stan",
+    "email": "elena.stan@gmail.com",
+    "phone": "0755777888",
+    "routeId": "demo-route-4",
+    "pickupCity": "Iasi",
+    "destination": "Sibiu",
+    "date": "2025-05-14",
+    "createdAt": "2025-05-08T18:20:00.000Z",
+    "company": "EuroShuttle"
+  }
+]
