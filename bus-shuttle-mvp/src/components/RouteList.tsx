@@ -22,7 +22,7 @@ const RouteList: React.FC<RouteListProps> = ({ routes, onSelect }) => (
           <h3>{route.departure} → {route.arrival}</h3>
           <p><strong>Departure City:</strong> {route.departure || '-'}</p>
           <p><strong>Arrival City:</strong> {route.arrival || '-'}</p>
-          <p><strong>Date:</strong> {route.departureTime ? new Date(route.departureTime).toLocaleString() : '-'}</p>
+          <p><strong>Date:</strong> {route.departure ? new Date(route.departure).toLocaleString() : '-'}</p>
           <p><strong>Company:</strong> {route.company?.name || '-'}</p>
           <p><strong>Price:</strong> <span style={{ color: '#1976d2', fontWeight: 700 }}>€{route.price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></p>
           <button onClick={() => onSelect(route)}>
