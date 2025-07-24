@@ -24,7 +24,7 @@ const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => (
     <h2>{route.origin} → {route.destination}</h2>
     <p><strong>Departure:</strong> {new Date(route.departure).toLocaleString()}</p>
     <p><strong>Arrival:</strong> {new Date(route.arrival).toLocaleString()}</p>
-    <p><strong>Stops:</strong> {route.stops.join(', ')}</p>
+    <p><strong>Stops:</strong> {Array.isArray(route.stops) ? route.stops.join(', ') : 'N/A'}</p>
     <p><strong>Provider:</strong> {route.provider}</p>
     <p><strong>Vehicle Type:</strong> {route.vehicleType}</p>
     <p><strong>Rating:</strong> {route.rating}</p>

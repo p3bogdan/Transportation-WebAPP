@@ -11,4 +11,5 @@ export interface Route {
   vehicleType: string;
   rating: number;
   cancellationPolicy: string;
+  company?: { id: number; name: string };
 }

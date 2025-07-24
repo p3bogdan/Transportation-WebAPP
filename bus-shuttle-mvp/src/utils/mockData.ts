@@ -1,38 +1,41 @@
 // Mock data for routes, bookings, and providers
+// Exporting an array of route objects, each representing a transportation route
 export const routes = [
   {
-    id: '1',
-    origin: 'Bucharest',
-    destination: 'Vienna',
-    stops: ['Sibiu', 'Budapest'],
-    departure: '2025-05-10T08:00:00Z',
-    arrival: '2025-05-10T20:00:00Z',
-    price: 60,
-    provider: 'TransEuro',
-    vehicleType: 'Bus',
-    rating: 4.5,
-    cancellationPolicy: 'Free cancellation up to 24h before departure',
+    id: '1', // Unique identifier for the route
+    origin: 'Bucharest', // Starting city
+    destination: 'Vienna', // Ending city
+    stops: ['Sibiu', 'Budapest'], // Intermediate stops
+    departure: '2025-05-10T08:00:00Z', // Departure time (ISO format)
+    arrival: '2025-05-10T20:00:00Z', // Arrival time (ISO format)
+    price: 60, // Ticket price in EUR
+    provider: 'TransEuro', // Transportation provider name
+    vehicleType: 'Bus', // Type of vehicle
+    rating: 4.5, // Provider or route rating
+    cancellationPolicy: 'Free cancellation up to 24h before departure', // Cancellation policy description
   },
   {
-    id: '2',
-    origin: 'Cluj-Napoca',
-    destination: 'Munich',
-    stops: ['Oradea', 'Vienna'],
-    departure: '2025-05-11T09:00:00Z',
-    arrival: '2025-05-11T21:00:00Z',
-    price: 75,
-    provider: 'EuroShuttle',
-    vehicleType: 'Shuttle',
-    rating: 4.2,
-    cancellationPolicy: 'Non-refundable',
+    id: '2', // Unique identifier for the route
+    origin: 'Cluj-Napoca', // Starting city
+    destination: 'Munich', // Ending city
+    stops: ['Oradea', 'Vienna'], // Intermediate stops
+    departure: '2025-05-11T09:00:00Z', // Departure time (ISO format)
+    arrival: '2025-05-11T21:00:00Z', // Arrival time (ISO format)
+    price: 75, // Ticket price in EUR
+    provider: 'EuroShuttle', // Transportation provider name
+    vehicleType: 'Shuttle', // Type of vehicle
+    rating: 4.2, // Provider or route rating
+    cancellationPolicy: 'Non-refundable', // Cancellation policy description
   },
 ];
 
+// Exporting an array for bookings (currently empty, can be populated with booking objects)
 export const bookings = [
   // Example booking objects can be added here
 ];
 
+// Exporting an array of provider objects, each representing a transportation provider
 export const providers = [
-  { id: 'p1', name: 'TransEuro', rating: 4.5 },
-  { id: 'p2', name: 'EuroShuttle', rating: 4.2 },
+  { id: 'p1', name: 'TransEuro', rating: 4.5 }, // Provider 1
+  { id: 'p2', name: 'EuroShuttle', rating: 4.2 }, // Provider 2
 ];

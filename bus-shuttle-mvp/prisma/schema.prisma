@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Route {
+  id            Int       @id @default(autoincrement())
+  provider      String
+  companyId     Int?
+  company       Company?  @relation(fields: [companyId], references: [id])
+  departure     String
+  arrival       String
+  departureTime DateTime
+  arrivalTime   DateTime
+  price         Float
+  seats         Int
+  vehicleType   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  bookings      Booking[]
+}
+
+model Booking {
+  id            Int      @id @default(autoincrement())
+  routeId       Int
+  userId        Int
+  status        String   @default("pending")
+  amount        Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  paymentStatus String?  // e.g., "succeeded", "failed", "pending"
+  route         Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  User          User     @relation(fields: [userId], references: [id])
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  phone     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  Booking   Booking[]
+}
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  routes    Route[]
+}

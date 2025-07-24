@@ -1,6 +1,10 @@
 import React from 'react';
 import { Route } from '../utils/types';
 
+// RouteList component displays a list of available transportation routes
+// Props: 
+// - routes: array of route objects to display
+// - onSelect: callback function to handle route selection
 interface RouteListProps {
   routes: Route[];
   onSelect: (route: Route) => void;
@@ -8,17 +12,19 @@ interface RouteListProps {
 
 const RouteList: React.FC<RouteListProps> = ({ routes, onSelect }) => (
   <div>
+    {/* Check if there are no routes to display */}
     {routes.length === 0 ? (
       <p>No routes found.</p>
     ) : (
+      /* Iterate over the routes array and render details for each route */
       routes.map(route => (
         <div key={route.id} className="route-card">
-          <h3>{route.origin} → {route.destination}</h3>
-          <p><strong>Departure:</strong> {new Date(route.departure).toLocaleString()}</p>
-          <p><strong>Arrival:</strong> {new Date(route.arrival).toLocaleString()}</p>
-          <p><strong>Price:</strong> <span style={{ color: '#1976d2', fontWeight: 700 }}>€{route.price}</span></p>
-          <p><strong>Provider:</strong> {route.provider} <span style={{ color: '#607d8b', fontSize: '0.95em' }}>({route.vehicleType})</span></p>
-          <p><strong>Rating:</strong> <span style={{ color: '#ffb300' }}>★</span> {route.rating}</p>
+          <h3>{route.departure} → {route.arrival}</h3>
+          <p><strong>Departure City:</strong> {route.departure || '-'}</p>
+          <p><strong>Arrival City:</strong> {route.arrival || '-'}</p>
+          <p><strong>Date:</strong> {route.departureTime ? new Date(route.departureTime).toLocaleString() : '-'}</p>
+          <p><strong>Company:</strong> {route.company?.name || '-'}</p>
+          <p><strong>Price:</strong> <span style={{ color: '#1976d2', fontWeight: 700 }}>€{route.price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></p>
           <button onClick={() => onSelect(route)}>
             View Details & Book
           </button>
