@@ -17,72 +17,6 @@ interface BookingFormProps {
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-const StripePaymentForm: React.FC<{ amount: number; onSuccess: () => void }> = ({ amount, onSuccess }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleStripePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    // Create PaymentIntent on server
-    const res = await fetch('/api/create-payment-intent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: amount * 100, currency: 'eur' }),
-    });
-    const data = await res.json();
-    if (!data.clientSecret) {
-      setError('Failed to initialize payment.');
-      setLoading(false);
-      return;
-    }
-    const cardElement = elements?.getElement(CardElement);
-    if (!stripe || !cardElement) {
-      setError('Stripe not loaded.');
-      setLoading(false);
-      return;
-    }
-    const result = await stripe.confirmCardPayment(data.clientSecret, {
-      payment_method: {
-        card: cardElement,
-      },
-    });
-    if (result.error) {
-      setError(result.error.message || 'Payment failed.');
-    } else if (result.paymentIntent?.status === 'succeeded') {
-      // Send booking info to backend with paymentStatus
-      await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          email,
-          phone,
-          pickupAddress,
-          paymentMethod: 'card',
-          route,
-          paymentStatus: result.paymentIntent.status,
-        }),
-      });
-      onSuccess();
-    }
-    setLoading(false);
-  };
-
-  return (
-    <form onSubmit={handleStripePayment} style={{ marginTop: 12 }}>
-      <CardElement options={{ hidePostalCode: true }} />
-      <button type="submit" disabled={loading} style={{ marginTop: 12 }}>
-        {loading ? 'Processing...' : 'Pay Now'}
-      </button>
-      {error && <div style={{ color: 'red', marginTop: 8 }}>{error}</div>}
-    </form>
-  );
-};
-
 const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -146,7 +80,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
         />
         <input
           type="text"
-          placeholder="Pickup address"
+          placeholder="Pickup city"
           value={pickupAddress}
           onChange={e => setPickupAddress(e.target.value)}
           required
@@ -176,12 +110,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
         {paymentMethod === 'cash' && (
           <button type="submit" disabled={submitting}>{submitting ? 'Booking...' : 'Confirm Booking'}</button>
         )}
-        {paymentMethod === 'card' && !cardPaid && (
+        {paymentMethod === 'card' && (
           <Elements stripe={stripePromise}>
-            <StripePaymentForm amount={route.price} onSuccess={() => {
-              setCardPaid(true);
-              onConfirm({ name, email, phone, pickupAddress, paymentMethod: 'card' });
-            }} />
+            <StripeCardSection
+              name={name}
+              email={email}
+              phone={phone}
+              pickupAddress={pickupAddress}
+              route={route}
+              submitting={submitting}
+              setSubmitting={setSubmitting}
+              setCardPaid={setCardPaid}
+              setSubmitError={setSubmitError}
+              onConfirm={onConfirm}
+            />
           </Elements>
         )}
         {paymentMethod === 'card' && cardPaid && (
@@ -198,6 +140,83 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
         <p><strong>Company Phone:</strong> 0123-456-789</p> {/* Replace with real phone if available */}
       </div>
     </div>
+  );
+};
+
+const StripeCardSection: React.FC<{
+  name: string;
+  email: string;
+  phone: string;
+  pickupAddress: string;
+  route: Route;
+  submitting: boolean;
+  setSubmitting: (v: boolean) => void;
+  setCardPaid: (v: boolean) => void;
+  setSubmitError: (v: string | null) => void;
+  onConfirm: (data: { name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string }) => void;
+}> = ({ name, email, phone, pickupAddress, route, submitting, setSubmitting, setCardPaid, setSubmitError, onConfirm }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handleStripePayment = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setSubmitError(null);
+    if (!stripe || !elements) {
+      setSubmitError('Stripe not loaded.');
+      setSubmitting(false);
+      return;
+    }
+    try {
+      const res = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: route.price * 100, currency: 'eur' }),
+      });
+      const data = await res.json();
+      if (!data.clientSecret) throw new Error('Failed to initialize payment.');
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) throw new Error('Card element not found.');
+      const result = await stripe.confirmCardPayment(data.clientSecret, {
+        payment_method: { card: cardElement },
+      });
+      if (result.error) throw new Error(result.error.message || 'Payment failed.');
+      if (result.paymentIntent?.status === 'succeeded') {
+        await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email,
+            phone,
+            pickupAddress,
+            paymentMethod: 'card',
+            route,
+            paymentStatus: result.paymentIntent.status,
+          }),
+        });
+        setCardPaid(true);
+        onConfirm({ name, email, phone, pickupAddress, paymentMethod: 'card' });
+      }
+    } catch (err: any) {
+      setSubmitError(err.message || 'Unknown error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <CardElement options={{ hidePostalCode: true }} />
+      <button
+        type="button"
+        disabled={submitting}
+        style={{ marginTop: 12 }}
+        onClick={handleStripePayment}
+      >
+        {submitting ? 'Processing...' : 'Pay Now'}
+      </button>
+    </>
   );
 };
 

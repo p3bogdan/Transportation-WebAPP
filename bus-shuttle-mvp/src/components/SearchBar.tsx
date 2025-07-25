@@ -18,14 +18,14 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
     <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       <input
         type="text"
-        placeholder="Pickup address"
+        placeholder="Pickup city"
         value={origin}
         onChange={e => setOrigin(e.target.value)}
         required
       />
       <input
         type="text"
-        placeholder="Drop-off address"
+        placeholder="Drop-off city"
         value={destination}
         onChange={e => setDestination(e.target.value)}
         required

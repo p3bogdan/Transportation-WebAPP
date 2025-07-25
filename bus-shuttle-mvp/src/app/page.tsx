@@ -17,6 +17,11 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const routesPerPage = 10;
+  const totalPages = Math.ceil(searchResults.length / routesPerPage);
+
   useEffect(() => {
     async function fetchRoutes() {
       setLoading(true);
@@ -70,6 +75,20 @@ export default function HomePage() {
     // Here you would call the booking API and send email/SMS
   };
 
+  // Get routes for current page
+  const paginatedRoutes = searchResults.slice(
+    (currentPage - 1) * routesPerPage,
+    currentPage * routesPerPage
+  );
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    setSelectedRoute(null);
+    setBookingMode(false);
+    setBookingConfirmed(false);
+  };
+
   return (
     <main className="homepage-main">
       <header className="homepage-header">
@@ -78,6 +97,22 @@ export default function HomePage() {
         </h1>
         <p className="homepage-subtitle">Find, compare, and book your next journey with ease</p>
       </header>
+      <nav style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+        <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
+        <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
+      </nav>
+      <section className="homepage-info" style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
+        <h2>About This Website</h2>
+        <p>
+          This portal helps Romanian travelers find and book bus transportation to other countries easily. You can search, compare, and reserve your journey all in one place.
+        </p>
+        <p>
+          For any questions or assistance, call us at <strong>0722 499 563</strong>.
+        </p>
+        <p>
+          <em>This is a project for NCI 2025 Bogdan Munteanu.</em>
+        </p>
+      </section>
       <section className="homepage-search-section">
         <SearchBar onSearch={handleSearch} />
       </section>
@@ -85,7 +120,24 @@ export default function HomePage() {
         {loading && <p>Loading routes...</p>}
         {error && <p style={{ color: 'red' }}>{error}</p>}
         {!loading && !error && !selectedRoute && (
-          <RouteList routes={searchResults} onSelect={handleSelectRoute} />
+          <>
+            <RouteList routes={paginatedRoutes} onSelect={handleSelectRoute} />
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 24 }}>
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+              <span>Page {currentPage} of {totalPages}</span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </>
         )}
         {!loading && !error && selectedRoute && !bookingMode && !bookingConfirmed && (
           <RouteDetails route={selectedRoute} onBook={handleBook} />
