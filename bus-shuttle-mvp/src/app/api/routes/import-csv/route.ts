@@ -1,38 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@/generated/prisma';
+import { prisma } from '@/generated/prisma/client-singleton';
 import { parse } from 'csv-parse/sync';
-
-const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file');
-    if (!file || typeof file === 'string') {
+    const file = formData.get('file') as File;
+    
+    if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
-    // Use TextDecoder for robust arrayBuffer to string conversion
-    const arrayBuffer = await file.arrayBuffer();
-    const csvString = new TextDecoder('utf-8').decode(arrayBuffer);
 
-    // Ensure the CSV string ends with a newline for robust parsing
-    const csvStringFixed = csvString.endsWith('\n') ? csvString : csvString + '\n';
-    console.log('Raw CSV string:', JSON.stringify(csvStringFixed));
-    // Force record_delimiter to '\n' for macOS/Unix CSVs
-    const records = parse(csvStringFixed, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      record_delimiter: '\n',
-    });
-    console.log('Parsed records:', records.length, records);
-    if (records.length === 0) {
-      // Debug: print lines if parsing fails
-      const lines = csvStringFixed.split('\n');
-      console.log('CSV lines:', lines.length, lines);
-    }
+    const csvText = await file.text();
+    const records = parse(csvText, { 
+      columns: true, 
+      skip_empty_lines: true 
+    }) as Record<string, string>[];
 
-    const requiredFields = ['departure', 'arrival', 'departureTime', 'arrivalTime', 'price', 'provider', 'companyId'];
+    const requiredFields = ['provider', 'departure', 'arrival', 'departureTime', 'arrivalTime', 'price', 'seats', 'vehicleType'];
     const results = { imported: 0, failed: 0, errors: [] as any[] };
 
     for (const [i, row] of records.entries()) {
@@ -41,60 +26,55 @@ export async function POST(request: NextRequest) {
       if (missing.length) {
         results.failed++;
         results.errors.push({ row: i + 2, error: `Missing fields: ${missing.join(', ')}` });
-        console.log(`Row ${i + 2} skipped: missing fields: ${missing.join(', ')}`);
         continue;
       }
-      // Validate date
-      const departureTime = new Date(row.departureTime);
-      const arrivalTime = new Date(row.arrivalTime);
-      if (isNaN(departureTime.getTime()) || isNaN(arrivalTime.getTime())) {
-        results.failed++;
-        results.errors.push({ row: i + 2, error: 'Invalid date format' });
-        console.log(`Row ${i + 2} skipped: invalid date format`);
-        continue;
-      }
-      // Validate price
-      const price = Number(row.price);
-      if (isNaN(price) || price < 0) {
-        results.failed++;
-        results.errors.push({ row: i + 2, error: 'Invalid price' });
-        console.log(`Row ${i + 2} skipped: invalid price`);
-        continue;
-      }
-      // Validate companyId
-      const companyId = Number(row.companyId);
-      if (isNaN(companyId) || companyId < 1) {
-        results.failed++;
-        results.errors.push({ row: i + 2, error: 'Invalid companyId' });
-        console.log(`Row ${i + 2} skipped: invalid companyId`);
-        continue;
-      }
+
       try {
+        // Parse and validate data
+        const price = parseFloat(row.price);
+        const seats = parseInt(row.seats);
+        
+        if (isNaN(price) || isNaN(seats)) {
+          results.failed++;
+          results.errors.push({ row: i + 2, error: 'Invalid price or seats number' });
+          continue;
+        }
+
+        // Create route in database
         await prisma.route.create({
           data: {
+            provider: row.provider,
             departure: row.departure,
             arrival: row.arrival,
-            departureTime,
-            arrivalTime,
+            departureTime: new Date(row.departureTime),
+            arrivalTime: new Date(row.arrivalTime),
             price,
-            provider: row.provider,
-            companyId,
-            vehicleType: row.vehicleType || '',
-            seats: row.seats ? Number(row.seats) : 0,
-            createdAt: new Date(),
+            seats,
+            vehicleType: row.vehicleType,
             updatedAt: new Date(),
           },
         });
+
         results.imported++;
-        console.log(`Row ${i + 2} imported successfully.`);
-      } catch (err: any) {
+      } catch (error: any) {
         results.failed++;
-        results.errors.push({ row: i + 2, error: err.message });
-        console.log(`Row ${i + 2} failed to import: ${err.message}`);
+        results.errors.push({ 
+          row: i + 2, 
+          error: error.message || 'Unknown error occurred' 
+        });
       }
     }
-    return NextResponse.json(results);
+
+    return NextResponse.json({
+      message: `Import completed. ${results.imported} routes imported, ${results.failed} failed.`,
+      results
+    });
+
   } catch (error: any) {
-    return NextResponse.json({ error: 'Failed to import CSV', details: error.message }, { status: 500 });
+    console.error('CSV import error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process CSV file', details: error.message },
+      { status: 500 }
+    );
   }
 }

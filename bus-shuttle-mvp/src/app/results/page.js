@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
+"use client";
+
+import React, { useEffect, useState, Suspense } from "react";
 import RouteList from "../../components/RouteList";
 import { useSearchParams } from "next/navigation";
 
-export default function ResultsPage() {
+function ResultsContent() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
@@ -24,19 +26,29 @@ export default function ResultsPage() {
   }, [searchParams]);
 
   return (
+    <>
+      <h2 style={{ color: "#1746d3", fontSize: 28, marginBottom: 24 }}>Available Routes</h2>
+      {/* Filters placeholder */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ marginRight: 16 }}>
+          <input type="checkbox" /> Cheapest
+        </label>
+        <label style={{ marginRight: 16 }}>
+          <input type="checkbox" /> Fastest
+        </label>
+      </div>
+      {loading ? <div>Loading...</div> : <RouteList routes={routes} />}
+    </>
+  );
+}
+
+export default function ResultsPage() {
+  return (
     <main style={{ minHeight: "100vh", background: "#f3f7fa" }}>
       <div style={{ maxWidth: 800, margin: "0 auto", paddingTop: 40 }}>
-        <h2 style={{ color: "#1746d3", fontSize: 28, marginBottom: 24 }}>Available Routes</h2>
-        {/* Filters placeholder */}
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ marginRight: 16 }}>
-            <input type="checkbox" /> Cheapest
-          </label>
-          <label style={{ marginRight: 16 }}>
-            <input type="checkbox" /> Fastest
-          </label>
-        </div>
-        {loading ? <div>Loading...</div> : <RouteList routes={routes} />}
+        <Suspense fallback={<div>Loading search results...</div>}>
+          <ResultsContent />
+        </Suspense>
       </div>
     </main>
   );

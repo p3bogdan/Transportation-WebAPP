@@ -7,7 +7,17 @@ export async function GET(request: NextRequest) {
     const bookings = await prisma.booking.findMany({
       include: { route: true, User: true },
     });
-    return NextResponse.json(bookings);
+    // Map pickupAddress from route.departure for each booking
+    const mapped = bookings.map(b => ({
+      ...b,
+      pickupAddress: b.route?.departure || '',
+      destination: b.route?.arrival || '',
+      user: b.User?.name || '',
+      email: b.User?.email || '',
+      phone: b.User?.phone || '',
+      company: b.route?.provider || '',
+    }));
+    return NextResponse.json(mapped);
   } catch (error) {
     console.error('GET /api/bookings error:', error);
     return NextResponse.json({ error: 'Failed to fetch bookings', details: String(error) }, { status: 500 });
@@ -19,6 +29,20 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     const { name, email, phone, pickupAddress, paymentMethod, route, paymentStatus } = data;
+
+    // Backend validation
+    if (!name || typeof name !== 'string' || name.length > 60) {
+      return NextResponse.json({ error: 'Name is required and must be ≤ 60 characters.' }, { status: 400 });
+    }
+    if (!email || typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email)) {
+      return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
+    }
+    if (!phone || typeof phone !== 'string' || !/^\+\d{8,15}$/.test(phone)) {
+      return NextResponse.json({ error: 'Enter a valid international phone number (e.g. +40712345678).' }, { status: 400 });
+    }
+    if (!pickupAddress || typeof pickupAddress !== 'string' || pickupAddress.length > 90) {
+      return NextResponse.json({ error: 'Pickup city is required and must be ≤ 90 characters.' }, { status: 400 });
+    }
     // Find or create user
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {

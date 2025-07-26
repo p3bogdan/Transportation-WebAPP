@@ -47,9 +47,11 @@ export default function HomePage() {
       const matchesDestination = r.arrival.toLowerCase().includes(destination.toLowerCase());
       let matchesDate = true;
       if (date) {
-        // Compare only the date part (YYYY-MM-DD)
-        const routeDate = r.departureTime ? new Date(r.departureTime).toISOString().slice(0, 10) : '';
-        matchesDate = routeDate === date;
+        // Assume r.departureTime or r.departure is an ISO string or date string
+        const routeDate = r.departureTime ? new Date(r.departureTime) : new Date(r.departure);
+        const searchDate = new Date(date);
+        // Compare only the date part (ignore time)
+        matchesDate = routeDate.toISOString().slice(0, 10) === searchDate.toISOString().slice(0, 10);
       }
       return matchesOrigin && matchesDestination && matchesDate;
     });

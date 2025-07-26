@@ -8,7 +8,7 @@ interface Booking {
   routeId: string;
   date: string;
   createdAt: string;
-  pickupCity?: string;
+  pickupAddress?: string;
   destination?: string;
   email?: string;
   phone?: string;
@@ -65,7 +65,7 @@ const AdminPanel: React.FC = () => {
             routeId: b.routeId,
             date: b.route?.departureTime || '-',
             createdAt: b.createdAt,
-            pickupCity: b.route?.departure || '-',
+            pickupAddress: b.route?.departure || '-',
             destination: b.route?.arrival || '-',
             email: b.User?.email || '-',
             phone: b.User?.phone || '-',
@@ -288,7 +288,7 @@ const AdminPanel: React.FC = () => {
                     {editIdx === idx ? (
                       <>
                         <td><input value={editBooking.user || ''} onChange={e => handleEditChange('user', e.target.value)} /></td>
-                        <td><input value={editBooking.pickupCity || ''} onChange={e => handleEditChange('pickupCity', e.target.value)} /></td>
+                        <td><input value={editBooking.pickupAddress || ''} onChange={e => handleEditChange('pickupAddress', e.target.value)} /></td>
                         <td><input value={editBooking.destination || ''} onChange={e => handleEditChange('destination', e.target.value)} /></td>
                         <td><input value={editBooking.email || ''} onChange={e => handleEditChange('email', e.target.value)} /></td>
                         <td><input value={editBooking.phone || ''} onChange={e => handleEditChange('phone', e.target.value)} /></td>
@@ -305,7 +305,7 @@ const AdminPanel: React.FC = () => {
                     ) : (
                       <>
                         <td>{booking.user}</td>
-                        <td>{booking.pickupCity || '-'}</td>
+                        <td>{booking.pickupAddress || '-'}</td>
                         <td>{booking.destination || '-'}</td>
                         <td>{booking.email || '-'}</td>
                         <td>{booking.phone || '-'}</td>

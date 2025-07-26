@@ -26,9 +26,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
   const [cardPaid, setCardPaid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; pickupAddress?: string }>({});
+
+  const validate = () => {
+    const newErrors: typeof errors = {};
+    if (!name || name.length > 60) newErrors.name = 'Name is required and must be ≤ 60 characters.';
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) newErrors.email = 'Enter a valid email address.';
+    if (!phone || !/^\+\d{8,15}$/.test(phone)) newErrors.phone = 'Enter a valid international phone number (e.g. +40712345678).';
+    if (!pickupAddress || pickupAddress.length > 90) newErrors.pickupAddress = 'Pickup city is required and must be ≤ 90 characters.';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     if (paymentMethod === 'card') return; // Stripe handles card submit
     setSubmitting(true);
     setSubmitError(null);
@@ -61,9 +73,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
           type="text"
           placeholder="Your Name"
           value={name}
+          maxLength={60}
           onChange={e => setName(e.target.value)}
           required
         />
+        {errors.name && <span style={{ color: 'red' }}>{errors.name}</span>}
         <input
           type="email"
           placeholder="Email"
@@ -71,20 +85,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
           onChange={e => setEmail(e.target.value)}
           required
         />
+        {errors.email && <span style={{ color: 'red' }}>{errors.email}</span>}
         <input
           type="tel"
-          placeholder="Phone Number"
+          placeholder="Phone (e.g. +40712345678)"
           value={phone}
+          maxLength={16}
           onChange={e => setPhone(e.target.value)}
           required
         />
+        {errors.phone && <span style={{ color: 'red' }}>{errors.phone}</span>}
         <input
           type="text"
-          placeholder="Pickup city"
+          placeholder="Pickup Address"
           value={pickupAddress}
+          maxLength={90}
           onChange={e => setPickupAddress(e.target.value)}
           required
         />
+        {errors.pickupAddress && <span style={{ color: 'red' }}>{errors.pickupAddress}</span>}
         <div>
           <label>
             <input
