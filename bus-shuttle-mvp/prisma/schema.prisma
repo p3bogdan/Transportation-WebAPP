@@ -57,3 +57,15 @@ model Company {
   updatedAt DateTime
   routes    Route[]
 }
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String   // Hashed password
+  role      String   @default("admin") // Could be "admin", "super_admin", etc.
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
