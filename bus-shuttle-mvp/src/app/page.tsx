@@ -20,6 +20,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [bookingData, setBookingData] = useState<{ name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string } | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [statistics, setStatistics] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,6 +52,27 @@ export default function HomePage() {
       }
     }
     fetchRoutes();
+  }, [isClient]);
+
+  useEffect(() => {
+    if (!isClient) return;
+
+    async function fetchStatistics() {
+      setStatsLoading(true);
+      try {
+        const res = await fetch('/api/statistics');
+        if (res.ok) {
+          const data = await res.json();
+          setStatistics(data);
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch statistics:', err);
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    fetchStatistics();
   }, [isClient]);
 
   const handleSearch = ({ origin, destination, date }: { origin: string; destination: string; date: string }) => {
@@ -225,6 +248,136 @@ export default function HomePage() {
           )}
         </div>
       </nav>
+      
+      {/* Statistics/Audit Section */}
+      {!statsLoading && statistics && (
+        <section style={{ 
+          marginBottom: 24, 
+          padding: 20, 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+          borderRadius: 12,
+          color: 'white'
+        }}>
+          <h2 style={{ margin: '0 0 20px 0', textAlign: 'center', color: 'white' }}>
+            📊 Platform Statistics
+          </h2>
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: 16,
+            marginBottom: 20
+          }}>
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🎫</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{statistics.totalBookings}</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Total Bookings</div>
+            </div>
+            
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{statistics.recentBookings}</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Last 7 Days</div>
+            </div>
+            
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>💰</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold' }}>€{statistics.totalRevenue.toFixed(2)}</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Total Revenue</div>
+            </div>
+            
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🚌</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{statistics.totalRoutes}</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Available Routes</div>
+            </div>
+            
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{statistics.totalUsers}</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Registered Users</div>
+            </div>
+            
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🏢</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{statistics.totalCompanies}</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Partner Companies</div>
+            </div>
+          </div>
+          
+          {/* Top Routes */}
+          {statistics.topRoutes && statistics.topRoutes.length > 0 && (
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              padding: 16, 
+              borderRadius: 8,
+              backdropFilter: 'blur(10px)'
+            }}>
+              <h3 style={{ margin: '0 0 12px 0', color: 'white' }}>🔥 Most Popular Routes</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {statistics.topRoutes.slice(0, 3).map((route: any, index: number) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    padding: '8px 12px',
+                    borderRadius: 6
+                  }}>
+                    <span style={{ fontSize: 14 }}>
+                      {route.departure} → {route.arrival}
+                    </span>
+                    <span style={{ 
+                      fontSize: 12, 
+                      background: 'rgba(255, 255, 255, 0.2)', 
+                      padding: '2px 8px', 
+                      borderRadius: 12 
+                    }}>
+                      {route.bookingCount} bookings
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       
       {/* Remove login requirement - allow guest bookings */}
       {!session && selectedRoute && bookingMode && (

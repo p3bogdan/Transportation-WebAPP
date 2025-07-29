@@ -27,9 +27,22 @@ interface Route {
   companyId?: number;
 }
 
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    Booking: number;
+  };
+}
+
 const AdminPanel: React.FC = () => {
-  const [tab, setTab] = useState<'bookings' | 'addCompany' | 'routes'>('bookings');
+  const [tab, setTab] = useState<'bookings' | 'addCompany' | 'routes' | 'users'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editBooking, setEditBooking] = useState<Partial<Booking>>({});
@@ -52,6 +65,26 @@ const AdminPanel: React.FC = () => {
   const pageSize = 10;
   const totalPages = Math.ceil(routes.length / pageSize);
   const paginatedRoutes = routes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // User management state
+  const [users, setUsers] = useState<User[]>([]);
+  const [userLoading, setUserLoading] = useState(true);
+  const [editUserIdx, setEditUserIdx] = useState<number | null>(null);
+  const [editUser, setEditUser] = useState<Partial<User & { password?: string }>>({});
+  const [userMsg, setUserMsg] = useState('');
+  const [newUser, setNewUser] = useState<{ name: string; email: string; phone: string; password: string }>({
+    name: '',
+    email: '',
+    phone: '',
+    password: ''
+  });
+  // Booking filters state
+  const [bookingFilters, setBookingFilters] = useState({
+    search: '',
+    paymentStatus: '',
+    company: '',
+    dateFrom: '',
+    dateTo: '',
+  });
 
   useEffect(() => {
     if (tab === 'bookings') {
@@ -59,7 +92,7 @@ const AdminPanel: React.FC = () => {
       fetch('/api/bookings')
         .then(res => res.json())
         .then(data => {
-          setBookings(data.map((b: any) => ({
+          const bookingsData = data.map((b: any) => ({
             id: b.id,
             user: b.User?.name || '-',
             routeId: b.routeId,
@@ -71,7 +104,9 @@ const AdminPanel: React.FC = () => {
             phone: b.User?.phone || '-',
             company: b.route?.provider || '-',
             paymentStatus: b.paymentStatus || '-',
-          })));
+          }));
+          setBookings(bookingsData);
+          setFilteredBookings(bookingsData); // Initialize filtered bookings
           setLoading(false);
         });
     } else if (tab === 'addCompany') {
@@ -93,8 +128,53 @@ const AdminPanel: React.FC = () => {
       fetch('/api/companies')
         .then(res => res.json())
         .then(data => setCompanies(data));
+    } else if (tab === 'users') {
+      setUserLoading(true);
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+          setUsers(data);
+          setUserLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to fetch users:', error);
+          setUserLoading(false);
+        });
     }
   }, [tab]);
+
+  // Filter bookings whenever filters change
+  useEffect(() => {
+    if (bookings.length === 0) return;
+    
+    const filtered = bookings.filter(booking => {
+      const matchesSearch = !bookingFilters.search || 
+        booking.user.toLowerCase().includes(bookingFilters.search.toLowerCase()) ||
+        booking.email?.toLowerCase().includes(bookingFilters.search.toLowerCase()) ||
+        booking.phone?.includes(bookingFilters.search);
+      
+      const matchesPaymentStatus = !bookingFilters.paymentStatus || 
+        booking.paymentStatus === bookingFilters.paymentStatus;
+      
+      const matchesCompany = !bookingFilters.company || 
+        booking.company === bookingFilters.company;
+      
+      let matchesDateRange = true;
+      if (bookingFilters.dateFrom || bookingFilters.dateTo) {
+        const bookingDate = new Date(booking.date);
+        if (bookingFilters.dateFrom) {
+          matchesDateRange = matchesDateRange && bookingDate >= new Date(bookingFilters.dateFrom);
+        }
+        if (bookingFilters.dateTo) {
+          matchesDateRange = matchesDateRange && bookingDate <= new Date(bookingFilters.dateTo);
+        }
+      }
+      
+      return matchesSearch && matchesPaymentStatus && matchesCompany && matchesDateRange;
+    });
+    
+    setFilteredBookings(filtered);
+  }, [bookings, bookingFilters]);
 
   const handleEdit = (idx: number) => {
     setEditIdx(idx);
@@ -249,6 +329,73 @@ const AdminPanel: React.FC = () => {
       setCsvMsg('Failed to import CSV');
     }
   };
+  // User CRUD handlers
+  const handleEditUser = (idx: number) => {
+    setEditUserIdx(idx);
+    setEditUser({ ...users[idx], password: '' });
+  };
+
+  const handleEditUserChange = (field: keyof (User & { password?: string }), value: string) => {
+    setEditUser(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditUserSave = async (id: number) => {
+    const res = await fetch('/api/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...editUser, id }),
+    });
+    
+    if (res.ok) {
+      const updatedUser = await res.json();
+      setUsers(prev => prev.map((u, i) => (i === editUserIdx ? updatedUser : u)));
+      setEditUserIdx(null);
+      setEditUser({});
+      setUserMsg('User updated successfully!');
+    } else {
+      const error = await res.json();
+      setUserMsg(`Failed to update user: ${error.error}`);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+    
+    const res = await fetch('/api/users', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    
+    if (res.ok) {
+      setUsers(prev => prev.filter(u => u.id !== id));
+      setUserMsg('User deleted successfully!');
+    } else {
+      const error = await res.json();
+      setUserMsg(`Failed to delete user: ${error.error}`);
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserMsg('');
+    
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newUser),
+    });
+    
+    if (res.ok) {
+      const createdUser = await res.json();
+      setUsers(prev => [createdUser, ...prev]);
+      setNewUser({ name: '', email: '', phone: '', password: '' });
+      setUserMsg('User created successfully!');
+    } else {
+      const error = await res.json();
+      setUserMsg(`Failed to create user: ${error.error}`);
+    }
+  };
 
   return (
     <div>
@@ -257,13 +404,110 @@ const AdminPanel: React.FC = () => {
         <button onClick={() => setTab('bookings')} style={{ fontWeight: tab === 'bookings' ? 'bold' : 'normal' }}>Bookings</button>
         <button onClick={() => setTab('addCompany')} style={{ fontWeight: tab === 'addCompany' ? 'bold' : 'normal' }}>Add Company</button>
         <button onClick={() => setTab('routes')} style={{ fontWeight: tab === 'routes' ? 'bold' : 'normal' }}>Routes</button>
+        <button onClick={() => setTab('users')} style={{ fontWeight: tab === 'users' ? 'bold' : 'normal' }}>Users</button>
       </div>
       {tab === 'bookings' && (
         <div>
           <h3>Reservations</h3>
+          
+          {/* Results Counter */}
+          <div style={{ 
+            marginBottom: 16, 
+            padding: 12, 
+            backgroundColor: '#f8f9fa', 
+            border: '1px solid #dee2e6', 
+            borderRadius: 6,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <strong>Results: {filteredBookings.length}</strong>
+              {filteredBookings.length !== bookings.length && (
+                <span style={{ color: '#6c757d', marginLeft: 8 }}>
+                  (filtered from {bookings.length} total)
+                </span>
+              )}
+            </div>
+            {(bookingFilters.search || bookingFilters.paymentStatus || bookingFilters.company || bookingFilters.dateFrom || bookingFilters.dateTo) && (
+              <button 
+                onClick={() => {
+                  setBookingFilters({
+                    search: '',
+                    paymentStatus: '',
+                    company: '',
+                    dateFrom: '',
+                    dateTo: '',
+                  });
+                }}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  cursor: 'pointer'
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder="Search by user, email, or phone"
+              value={bookingFilters.search}
+              onChange={e => setBookingFilters(prev => ({ ...prev, search: e.target.value }))}
+            />
+            <select
+              value={bookingFilters.paymentStatus}
+              onChange={e => setBookingFilters(prev => ({ ...prev, paymentStatus: e.target.value }))}
+            >
+              <option value="">All Payment Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+            <select
+              value={bookingFilters.company}
+              onChange={e => setBookingFilters(prev => ({ ...prev, company: e.target.value }))}
+            >
+              <option value="">All Companies</option>
+              {companies.map(company => (
+                <option key={company.id} value={company.provider}>{company.provider}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={bookingFilters.dateFrom}
+              onChange={e => setBookingFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+            />
+            <input
+              type="date"
+              value={bookingFilters.dateTo}
+              onChange={e => setBookingFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+            />
+            <button onClick={() => {
+              // Apply filters
+              setFilteredBookings(bookings.filter(booking => {
+                const matchesSearch = booking.user.toLowerCase().includes(bookingFilters.search.toLowerCase()) ||
+                                      booking.email?.toLowerCase().includes(bookingFilters.search.toLowerCase()) ||
+                                      booking.phone?.includes(bookingFilters.search);
+                const matchesPaymentStatus = booking.paymentStatus === bookingFilters.paymentStatus || bookingFilters.paymentStatus === '';
+                const matchesCompany = booking.company === bookingFilters.company || bookingFilters.company === '';
+                const date = new Date(booking.date);
+                const matchesDateFrom = bookingFilters.dateFrom === '' || date >= new Date(bookingFilters.dateFrom);
+                const matchesDateTo = bookingFilters.dateTo === '' || date <= new Date(bookingFilters.dateTo);
+                return matchesSearch && matchesPaymentStatus && matchesCompany && matchesDateFrom && matchesDateTo;
+              }));
+            }}>Filter</button>
+          </div>
           {loading ? (
             <p>Loading reservations...</p>
-          ) : bookings.length === 0 ? (
+          ) : filteredBookings.length === 0 ? (
             <p>No reservations found.</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -283,7 +527,7 @@ const AdminPanel: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {bookings.map((booking, idx) => (
+                {filteredBookings.map((booking, idx) => (
                   <tr key={booking.id}>
                     {editIdx === idx ? (
                       <>
@@ -464,6 +708,89 @@ const AdminPanel: React.FC = () => {
           <input type="file" accept=".csv" onChange={handleCsvChange} />
           <button onClick={handleCsvImport} disabled={!csvFile}>Import CSV</button>
           {csvMsg && <div style={{ color: 'green', marginTop: 8 }}>{csvMsg}</div>}
+        </div>
+      )}
+      {tab === 'users' && (
+        <div>
+          <h3>Users</h3>
+          {userLoading ? (
+            <p>Loading users...</p>
+          ) : users.length === 0 ? (
+            <p>No users found.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Bookings Count</th>
+                  <th>Edit</th>
+                  <th>Delete</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user, idx) => (
+                  <tr key={user.id}>
+                    {editUserIdx === idx ? (
+                      <>
+                        <td><input value={editUser.name || ''} onChange={e => handleEditUserChange('name', e.target.value)} /></td>
+                        <td><input value={editUser.email || ''} onChange={e => handleEditUserChange('email', e.target.value)} /></td>
+                        <td><input value={editUser.phone || ''} onChange={e => handleEditUserChange('phone', e.target.value)} /></td>
+                        <td>{user._count?.Booking || 0}</td>
+                        <td>
+                          <button onClick={() => handleEditUserSave(user.id)}>Save</button>
+                          <button onClick={() => setEditUserIdx(null)}>Cancel</button>
+                        </td>
+                        <td><button onClick={() => handleDeleteUser(user.id)}>Delete</button></td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{user.name}</td>
+                        <td>{user.email}</td>
+                        <td>{user.phone || '-'}</td>
+                        <td>{user._count?.Booking || 0}</td>
+                        <td><button onClick={() => handleEditUser(idx)}>Edit</button></td>
+                        <td><button onClick={() => handleDeleteUser(user.id)}>Delete</button></td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <h4 style={{ marginTop: 32 }}>Add New User</h4>
+          <form onSubmit={handleAddUser} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Name"
+              value={newUser.name}
+              onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+              required
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={newUser.email}
+              onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Phone"
+              value={newUser.phone}
+              onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={newUser.password}
+              onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+              required
+            />
+            <button type="submit">Add User</button>
+          </form>
+          {userMsg && <div style={{ color: 'green', marginTop: 8 }}>{userMsg}</div>}
         </div>
       )}
     </div>
