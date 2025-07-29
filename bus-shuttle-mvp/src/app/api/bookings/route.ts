@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/generated/prisma/client-singleton';
+import { prisma } from '@/lib/prisma';
 
 // Handles GET requests to return the list of bookings from the database
 export async function GET(request: NextRequest) {

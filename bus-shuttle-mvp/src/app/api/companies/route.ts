@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/generated/prisma/client-singleton';
+import { prisma } from '@/lib/prisma';
 
 // GET: List all companies
 export async function GET() {

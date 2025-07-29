@@ -1,9 +1,7 @@
 import 'dotenv/config';
-import { PrismaClient } from '../src/generated/prisma/index.js';
+import { prisma } from '../src/lib/prisma';
 
 console.log('DATABASE_URL:', process.env.DATABASE_URL);
-
-const prisma = new PrismaClient();
 
 async function main() {
   // Clear existing data to avoid unique constraint errors

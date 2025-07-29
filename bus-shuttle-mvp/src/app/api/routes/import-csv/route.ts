@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/generated/prisma/client-singleton';
+import { prisma } from '@/lib/prisma';
 import { parse } from 'csv-parse/sync';
 
 export async function POST(request: NextRequest) {
