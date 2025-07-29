@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { signIn } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 
 interface Route {
   id?: number;
@@ -18,23 +18,21 @@ interface Route {
 interface BookingFormProps {
   route: Route;
   onConfirm: (data: { name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string }) => void;
+  isGuest?: boolean;
 }
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = false }) => {
+  const { data: session } = useSession();
+  const [name, setName] = useState(session?.user?.name || '');
+  const [email, setEmail] = useState(session?.user?.email || '');
   const [phone, setPhone] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [password, setPassword] = useState('');
   const [cardPaid, setCardPaid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [isNewUser, setIsNewUser] = useState(false);
-  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; pickupAddress?: string }>({});
 
   const validate = () => {
@@ -51,80 +49,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
     e.preventDefault();
     if (!validate()) return;
     
+    if (paymentMethod === 'card') return; // Let Stripe handle card payments
+    
     setSubmitting(true);
     setSubmitError(null);
-    
-    try {
-      // Check if user exists
-      const checkRes = await fetch(`/api/auth/check-user?email=${encodeURIComponent(email)}`);
-      const { exists } = await checkRes.json();
-      
-      if (exists) {
-        setIsNewUser(false);
-        setShowPasswordPrompt(true);
-        setAuthError('Account already exists, please log in.');
-      } else {
-        setIsNewUser(true);
-        setShowPasswordPrompt(true);
-        setAuthError(null);
-      }
-    } catch (err: any) {
-      setSubmitError(err.message || 'Unknown error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setAuthError(null);
-    
-    try {
-      if (isNewUser) {
-        // Register user
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, phone }),
-        });
-        
-        if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.error || 'Registration failed');
-        }
-        
-        // Don't use signIn for booking flow - just complete the booking directly
-        console.log('User registered successfully, proceeding with booking');
-      } else {
-        // For existing users, verify password manually without signIn redirect
-        const loginRes = await fetch('/api/auth/login-verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        
-        if (!loginRes.ok) {
-          throw new Error('Invalid email or password');
-        }
-        
-        console.log('User verified successfully, proceeding with booking');
-      }
-      
-      // Complete booking after successful authentication (without redirect)
-      setShowPasswordPrompt(false);
-      setPassword('');
-      await completeBooking();
-      
-    } catch (err: any) {
-      setAuthError(err.message || 'Authentication failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const completeBooking = async () => {
-    if (paymentMethod === 'card') return; // Stripe handles card booking
     
     try {
       const res = await fetch('/api/bookings', {
@@ -156,22 +84,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
       
       const bookingData = await res.json();
       console.log('Booking created successfully:', bookingData);
+      
       onConfirm({ name, email, phone, pickupAddress, paymentMethod });
     } catch (err: any) {
       console.error('Booking error:', err);
       setSubmitError(err.message || 'Booking failed');
+    } finally {
+      setSubmitting(false);
     }
-  };
-
-  const handleCancelAuth = () => {
-    setShowPasswordPrompt(false);
-    setPassword('');
-    setAuthError(null);
   };
 
   return (
     <div style={{ display: 'flex', gap: 32 }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 300 }}>
+        <h3 style={{ margin: '0 0 16px 0', color: '#333' }}>Booking Information</h3>
+        
         <input
           type="text"
           placeholder="Your Name"
@@ -179,9 +106,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
           maxLength={60}
           onChange={e => setName(e.target.value)}
           required
-          disabled={showPasswordPrompt}
+          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
         />
-        {errors.name && <span style={{ color: 'red' }}>{errors.name}</span>}
+        {errors.name && <span style={{ color: 'red', fontSize: 12 }}>{errors.name}</span>}
         
         <input
           type="email"
@@ -189,9 +116,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
           value={email}
           onChange={e => setEmail(e.target.value)}
           required
-          disabled={showPasswordPrompt}
+          disabled={!!session?.user?.email}
+          style={{ 
+            padding: 8, 
+            borderRadius: 4, 
+            border: '1px solid #ccc',
+            backgroundColor: session?.user?.email ? '#f5f5f5' : 'white'
+          }}
         />
-        {errors.email && <span style={{ color: 'red' }}>{errors.email}</span>}
+        {errors.email && <span style={{ color: 'red', fontSize: 12 }}>{errors.email}</span>}
         
         <input
           type="tel"
@@ -200,9 +133,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
           maxLength={16}
           onChange={e => setPhone(e.target.value)}
           required
-          disabled={showPasswordPrompt}
+          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
         />
-        {errors.phone && <span style={{ color: 'red' }}>{errors.phone}</span>}
+        {errors.phone && <span style={{ color: 'red', fontSize: 12 }}>{errors.phone}</span>}
         
         <input
           type="text"
@@ -211,114 +144,58 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
           maxLength={90}
           onChange={e => setPickupAddress(e.target.value)}
           required
-          disabled={showPasswordPrompt}
+          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
         />
-        {errors.pickupAddress && <span style={{ color: 'red' }}>{errors.pickupAddress}</span>}
+        {errors.pickupAddress && <span style={{ color: 'red', fontSize: 12 }}>{errors.pickupAddress}</span>}
         
-        <div>
-          <label>
+        <div style={{ margin: '16px 0' }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold', color: '#333' }}>
+            Payment Method:
+          </label>
+          <label style={{ display: 'block', marginBottom: 8 }}>
             <input
               type="radio"
               name="paymentMethod"
               value="cash"
               checked={paymentMethod === 'cash'}
               onChange={() => setPaymentMethod('cash')}
-              disabled={showPasswordPrompt}
+              style={{ marginRight: 8 }}
             />
-            Pay with Cash
+            Pay with Cash (on board)
           </label>
-          <label style={{ marginLeft: 16 }}>
+          <label style={{ display: 'block' }}>
             <input
               type="radio"
               name="paymentMethod"
               value="card"
               checked={paymentMethod === 'card'}
               onChange={() => setPaymentMethod('card')}
-              disabled={showPasswordPrompt}
+              style={{ marginRight: 8 }}
             />
-            Pay with Card
+            Pay with Card (online)
           </label>
         </div>
 
-        {/* Password Prompt Section */}
-        {showPasswordPrompt && (
-          <div style={{ 
-            border: '2px solid #1976d2', 
-            borderRadius: 8, 
-            padding: 16, 
-            marginTop: 16, 
-            backgroundColor: '#f8f9fa' 
-          }}>
-            <h3 style={{ margin: '0 0 12px 0', color: '#1976d2' }}>
-              {isNewUser ? 'Create Account' : 'Login Required'}
-            </h3>
-            <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>
-              {isNewUser 
-                ? 'Set a password to create your account and complete booking' 
-                : 'Enter your password to login and complete booking'
-              }
-            </p>
-            {/* Removed nested form - just use div with buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && password.length >= 6) {
-                    handlePasswordSubmit(e);
-                  }
-                }}
-              />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button 
-                  type="button"
-                  onClick={handlePasswordSubmit}
-                  disabled={submitting || !password}
-                  style={{ 
-                    flex: 1, 
-                    backgroundColor: '#1976d2', 
-                    color: 'white', 
-                    border: 'none', 
-                    padding: 8, 
-                    borderRadius: 4,
-                    cursor: submitting ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {submitting ? 'Processing...' : (isNewUser ? 'Register & Book' : 'Login & Book')}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleCancelAuth}
-                  style={{ 
-                    backgroundColor: '#666', 
-                    color: 'white', 
-                    border: 'none', 
-                    padding: 8, 
-                    borderRadius: 4,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-            {authError && <div style={{ color: 'red', marginTop: 8, fontSize: '14px' }}>{authError}</div>}
-          </div>
-        )}
-
-        {/* Regular booking button for when no password prompt is shown */}
-        {!showPasswordPrompt && paymentMethod === 'cash' && (
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Checking...' : 'Continue to Book'}
+        {paymentMethod === 'cash' && (
+          <button 
+            type="submit" 
+            disabled={submitting}
+            style={{
+              padding: 12,
+              backgroundColor: submitting ? '#ccc' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              fontSize: 16,
+              fontWeight: 'bold',
+              cursor: submitting ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {submitting ? 'Processing...' : 'Complete Booking'}
           </button>
         )}
         
-        {!showPasswordPrompt && paymentMethod === 'card' && (
+        {paymentMethod === 'card' && (
           <Elements stripe={stripePromise}>
             <StripeCardSection
               name={name}
@@ -331,24 +208,45 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm }) => {
               setCardPaid={setCardPaid}
               setSubmitError={setSubmitError}
               onConfirm={onConfirm}
-              requireAuth={true}
             />
           </Elements>
         )}
         
         {paymentMethod === 'card' && cardPaid && (
-          <div style={{ color: 'green', marginTop: 8 }}>Payment successful! Booking confirmed.</div>
+          <div style={{ color: 'green', marginTop: 8, fontWeight: 'bold' }}>
+            Payment successful! Booking confirmed.
+          </div>
         )}
-        {submitError && <div style={{ color: 'red', marginTop: 8 }}>{submitError}</div>}
+        
+        {submitError && (
+          <div style={{ color: 'red', marginTop: 8, fontSize: 14, padding: 8, backgroundColor: '#ffebee', borderRadius: 4 }}>
+            {submitError}
+          </div>
+        )}
       </form>
       
-      <div style={{ border: '1px solid #e0e0e0', borderRadius: 8, padding: 16, minWidth: 280, background: '#fafbfc' }}>
-        <h3>Booking Overview</h3>
-        <p><strong>Route:</strong> {route.departure} → {route.arrival}</p>
-        <p><strong>Price:</strong> €{route.price}</p>
-        <p><strong>Date & Time:</strong> {route.departureTime ? new Date(route.departureTime).toLocaleString() : 'TBD'}</p>
-        <p><strong>Company:</strong> {route.provider}</p>
-        <p><strong>Vehicle:</strong> {route.vehicleType || 'Bus'}</p>
+      <div style={{ border: '1px solid #e0e0e0', borderRadius: 8, padding: 16, minWidth: 280, background: '#fafbfc', height: 'fit-content' }}>
+        <h3 style={{ margin: '0 0 16px 0', color: '#333' }}>Booking Overview</h3>
+        <div style={{ marginBottom: 12 }}>
+          <strong>Route:</strong><br />
+          <span style={{ color: '#1976d2', fontSize: 18 }}>{route.departure} → {route.arrival}</span>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <strong>Price:</strong><br />
+          <span style={{ color: '#28a745', fontSize: 20, fontWeight: 'bold' }}>€{route.price}</span>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <strong>Date & Time:</strong><br />
+          {route.departureTime ? new Date(route.departureTime).toLocaleString() : 'TBD'}
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <strong>Company:</strong><br />
+          {route.provider}
+        </div>
+        <div>
+          <strong>Vehicle:</strong><br />
+          {route.vehicleType || 'Bus'}
+        </div>
       </div>
     </div>
   );
@@ -365,8 +263,7 @@ const StripeCardSection: React.FC<{
   setCardPaid: (v: boolean) => void;
   setSubmitError: (v: string | null) => void;
   onConfirm: (data: { name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string }) => void;
-  requireAuth?: boolean;
-}> = ({ name, email, phone, pickupAddress, route, submitting, setSubmitting, setCardPaid, setSubmitError, onConfirm, requireAuth = false }) => {
+}> = ({ name, email, phone, pickupAddress, route, submitting, setSubmitting, setCardPaid, setSubmitError, onConfirm }) => {
   const stripe = useStripe();
   const elements = useElements();
 
@@ -382,16 +279,6 @@ const StripeCardSection: React.FC<{
     }
     
     try {
-      // If authentication is required, handle it first
-      if (requireAuth) {
-        // Check if user exists and handle auth flow
-        const checkRes = await fetch(`/api/auth/check-user?email=${encodeURIComponent(email)}`);
-        const { exists } = await checkRes.json();
-        
-        // This would need to be handled differently for card payments
-        // For now, we'll proceed with the payment and let the booking API handle user creation
-      }
-      
       const res = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

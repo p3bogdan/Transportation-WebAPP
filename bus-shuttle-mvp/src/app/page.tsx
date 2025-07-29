@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import SearchBar from '../components/SearchBar';
 import RouteList from '../components/RouteList';
 import RouteDetails from '../components/RouteDetails';
@@ -9,6 +10,7 @@ import { Route } from '../utils/types';
 import './globals.css';
 
 export default function HomePage() {
+  const { data: session, status } = useSession();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [searchResults, setSearchResults] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
@@ -112,10 +114,10 @@ export default function HomePage() {
           <p className="homepage-subtitle">Find, compare, and book your next journey with ease</p>
         </header>
         
-        <nav style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+        <nav style={{ marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
           <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
           <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
-          <a href="/profile" style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Profile</a>
+          <a href="/auth/signin" style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Sign In</a>
         </nav>
         
         <section className="homepage-info" style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
@@ -164,11 +166,97 @@ export default function HomePage() {
         <p className="homepage-subtitle">Find, compare, and book your next journey with ease</p>
       </header>
       
-      <nav style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-        <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
-        <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
-        <a href="/profile" style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Profile</a>
+      <nav style={{ marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
+          <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
+        </div>
+        
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {session ? (
+            <>
+              <span style={{ color: '#666', fontSize: 14 }}>
+                Welcome, {session.user?.name || session.user?.email}
+              </span>
+              <a 
+                href="/profile" 
+                style={{ 
+                  padding: '8px 16px', 
+                  background: '#17a2b8', 
+                  color: '#fff', 
+                  borderRadius: 4, 
+                  textDecoration: 'none', 
+                  fontWeight: 500 
+                }}
+              >
+                My Profile
+              </a>
+              <button 
+                onClick={() => signOut({ callbackUrl: '/' })}
+                style={{ 
+                  padding: '8px 16px', 
+                  background: '#dc3545', 
+                  color: '#fff', 
+                  borderRadius: 4, 
+                  border: 'none',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <a 
+                href="/auth/signin" 
+                style={{ 
+                  padding: '8px 16px', 
+                  background: '#17a2b8', 
+                  color: '#fff', 
+                  borderRadius: 4, 
+                  textDecoration: 'none', 
+                  fontWeight: 500 
+                }}
+              >
+                Sign In
+              </a>
+            </>
+          )}
+        </div>
       </nav>
+      
+      {/* Remove login requirement - allow guest bookings */}
+      {!session && selectedRoute && bookingMode && (
+        <div style={{
+          maxWidth: 600,
+          margin: '0 auto 24px auto',
+          padding: 16,
+          backgroundColor: '#e3f2fd',
+          border: '1px solid #bbdefb',
+          borderRadius: 8,
+          textAlign: 'center'
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', color: '#1565c0' }}>Guest Booking</h3>
+          <p style={{ margin: '0 0 12px 0', color: '#1565c0' }}>
+            You're booking as a guest. Create an account after booking to track your trips.
+          </p>
+          <a 
+            href="/auth/signin"
+            style={{
+              display: 'inline-block',
+              padding: '6px 12px',
+              backgroundColor: '#1976d2',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: 4,
+              fontSize: 14
+            }}
+          >
+            Sign In for Account Benefits
+          </a>
+        </div>
+      )}
       
       <section className="homepage-info" style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
         <h2>About This Website</h2>
@@ -213,8 +301,13 @@ export default function HomePage() {
         {!loading && !error && selectedRoute && !bookingMode && !bookingConfirmed && (
           <RouteDetails route={selectedRoute} onBook={handleBook} />
         )}
+        {/* Allow booking for both authenticated and guest users */}
         {bookingMode && selectedRoute && !bookingConfirmed && (
-          <BookingForm route={selectedRoute} onConfirm={handleConfirmBooking} />
+          <BookingForm 
+            route={selectedRoute} 
+            onConfirm={handleConfirmBooking} 
+            isGuest={!session}
+          />
         )}
         {bookingConfirmed && selectedRoute && bookingData && (
           <div style={{ 
@@ -269,7 +362,7 @@ export default function HomePage() {
               </ul>
             </div>
             
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button 
                 onClick={() => {
                   setBookingConfirmed(false);
@@ -289,20 +382,37 @@ export default function HomePage() {
               >
                 Book Another Trip
               </button>
-              <a 
-                href="/profile" 
-                style={{ 
-                  padding: '12px 24px', 
-                  backgroundColor: '#17a2b8', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: 6,
-                  textDecoration: 'none',
-                  fontWeight: 'bold'
-                }}
-              >
-                View My Bookings
-              </a>
+              {session ? (
+                <a 
+                  href="/profile"
+                  style={{ 
+                    padding: '12px 24px', 
+                    backgroundColor: '#17a2b8', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  View My Bookings
+                </a>
+              ) : (
+                <a 
+                  href="/auth/signin"
+                  style={{ 
+                    padding: '12px 24px', 
+                    backgroundColor: '#28a745', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Create Account to Track Bookings
+                </a>
+              )}
             </div>
           </div>
         )}

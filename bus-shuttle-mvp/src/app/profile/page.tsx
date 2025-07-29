@@ -47,8 +47,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (status === 'loading') return;
+    
     if (!session) {
-      router.push('/');
+      router.push('/auth/signin');
       return;
     }
 
@@ -60,7 +61,25 @@ export default function ProfilePage() {
 
     try {
       const res = await fetch(`/api/profile?email=${encodeURIComponent(session.user.email)}`);
-      if (!res.ok) throw new Error('Failed to fetch profile');
+      if (!res.ok) {
+        if (res.status === 404) {
+          // User exists in session but not in our database - this can happen with NextAuth
+          // Let's create a minimal profile
+          setUser({
+            id: 0,
+            name: session.user.name || '',
+            email: session.user.email,
+            phone: '',
+            createdAt: new Date().toISOString()
+          });
+          setBookings([]);
+          setEditName(session.user.name || '');
+          setEditPhone('');
+          setLoading(false);
+          return;
+        }
+        throw new Error('Failed to fetch profile');
+      }
       
       const data = await res.json();
       setUser(data.user);
@@ -135,8 +154,22 @@ export default function ProfilePage() {
   if (error) {
     return (
       <div style={{ maxWidth: 800, margin: '40px auto', padding: 16 }}>
-        <div style={{ color: 'red', marginBottom: 16 }}>{error}</div>
-        <button onClick={() => router.push('/')}>Go Home</button>
+        <div style={{ color: 'red', marginBottom: 16, padding: 16, backgroundColor: '#ffebee', borderRadius: 8 }}>
+          {error}
+        </div>
+        <button 
+          onClick={() => router.push('/')}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#1976d2',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer'
+          }}
+        >
+          Go Home
+        </button>
       </div>
     );
   }
@@ -145,7 +178,7 @@ export default function ProfilePage() {
     <div style={{ maxWidth: 800, margin: '40px auto', padding: 16 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-        <h1 style={{ color: '#1746d3', fontSize: 28 }}>My Profile</h1>
+        <h1 style={{ color: '#1976d2', fontSize: 28 }}>My Profile</h1>
         <div style={{ display: 'flex', gap: 12 }}>
           <button 
             onClick={() => router.push('/')}
@@ -174,6 +207,22 @@ export default function ProfilePage() {
             Sign Out
           </button>
         </div>
+      </div>
+
+      {/* Welcome Message */}
+      <div style={{
+        backgroundColor: '#e3f2fd',
+        padding: 16,
+        borderRadius: 8,
+        marginBottom: 24,
+        border: '1px solid #bbdefb'
+      }}>
+        <h2 style={{ margin: '0 0 8px 0', color: '#1976d2' }}>
+          Welcome back, {user?.name || session.user?.name}! 👋
+        </h2>
+        <p style={{ margin: 0, color: '#1565c0' }}>
+          Manage your profile and view your booking history below.
+        </p>
       </div>
 
       {/* Profile Information */}
@@ -212,7 +261,7 @@ export default function ProfilePage() {
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 required
-                style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
+                style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ccc', boxSizing: 'border-box' }}
               />
             </div>
             <div>
@@ -222,7 +271,7 @@ export default function ProfilePage() {
                 value={editPhone}
                 onChange={(e) => setEditPhone(e.target.value)}
                 placeholder="e.g. +40712345678"
-                style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
+                style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ccc', boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -262,16 +311,16 @@ export default function ProfilePage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <strong>Name:</strong> {user?.name}
+              <strong>Name:</strong> {user?.name || session.user?.name}
             </div>
             <div>
-              <strong>Email:</strong> {user?.email}
+              <strong>Email:</strong> {user?.email || session.user?.email}
             </div>
             <div>
               <strong>Phone:</strong> {user?.phone || 'Not provided'}
             </div>
             <div>
-              <strong>Member since:</strong> {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+              <strong>Member since:</strong> {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Today'}
             </div>
           </div>
         )}
@@ -294,17 +343,22 @@ export default function ProfilePage() {
             borderRadius: 8,
             border: '1px solid #e9ecef'
           }}>
-            <p style={{ margin: 0, color: '#666' }}>No bookings found.</p>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎫</div>
+            <h3 style={{ margin: '0 0 8px 0', color: '#666' }}>No bookings yet</h3>
+            <p style={{ margin: '0 0 16px 0', color: '#666' }}>
+              Start your journey by booking your first trip!
+            </p>
             <button 
               onClick={() => router.push('/')}
               style={{ 
-                marginTop: 16,
-                padding: '8px 16px', 
+                padding: '12px 24px', 
                 backgroundColor: '#1976d2', 
                 color: 'white', 
                 border: 'none', 
                 borderRadius: 4,
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontSize: 16,
+                fontWeight: 'bold'
               }}
             >
               Book Your First Trip
@@ -318,13 +372,14 @@ export default function ProfilePage() {
                 style={{ 
                   border: '1px solid #e9ecef', 
                   borderRadius: 8, 
-                  padding: 16,
-                  backgroundColor: 'white'
+                  padding: 20,
+                  backgroundColor: 'white',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 16 }}>
                   <div>
-                    <h3 style={{ margin: '0 0 8px 0', color: '#1746d3' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#1976d2', fontSize: 20 }}>
                       {booking.route.departure} → {booking.route.arrival}
                     </h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
@@ -333,8 +388,8 @@ export default function ProfilePage() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ 
-                      padding: '4px 8px', 
-                      borderRadius: 4, 
+                      padding: '4px 12px', 
+                      borderRadius: 20, 
                       backgroundColor: getStatusColor(booking.status),
                       color: 'white',
                       fontSize: '12px',
@@ -344,8 +399,8 @@ export default function ProfilePage() {
                       {booking.status.toUpperCase()}
                     </div>
                     <div style={{ 
-                      padding: '4px 8px', 
-                      borderRadius: 4, 
+                      padding: '4px 12px', 
+                      borderRadius: 20, 
                       backgroundColor: getPaymentStatusColor(booking.paymentStatus),
                       color: 'white',
                       fontSize: '12px',
@@ -356,31 +411,24 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, fontSize: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, fontSize: '14px', marginBottom: 12 }}>
                   <div>
-                    <strong>Departure:</strong><br />
-                    {new Date(booking.route.departureTime).toLocaleString()}
+                    <strong style={{ color: '#333' }}>Departure:</strong><br />
+                    <span style={{ color: '#666' }}>{new Date(booking.route.departureTime).toLocaleString()}</span>
                   </div>
                   <div>
-                    <strong>Arrival:</strong><br />
-                    {new Date(booking.route.arrivalTime).toLocaleString()}
+                    <strong style={{ color: '#333' }}>Arrival:</strong><br />
+                    <span style={{ color: '#666' }}>{new Date(booking.route.arrivalTime).toLocaleString()}</span>
                   </div>
                   <div>
-                    <strong>Amount:</strong><br />
-                    €{booking.amount}
+                    <strong style={{ color: '#333' }}>Amount:</strong><br />
+                    <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: 16 }}>€{booking.amount}</span>
                   </div>
                 </div>
                 
-                {booking.route.company && (
-                  <div style={{ marginTop: 12, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 4 }}>
-                    <strong>Company:</strong> {booking.route.company.name}
-                    {booking.route.company.phone && (
-                      <span style={{ marginLeft: 16 }}>
-                        <strong>Phone:</strong> {booking.route.company.phone}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <div style={{ fontSize: 12, color: '#999', borderTop: '1px solid #eee', paddingTop: 8 }}>
+                  Booked on {new Date(booking.createdAt).toLocaleString()}
+                </div>
               </div>
             ))}
           </div>
