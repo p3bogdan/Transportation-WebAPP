@@ -17,13 +17,21 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookingData, setBookingData] = useState<{ name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string } | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const routesPerPage = 10;
   const totalPages = Math.ceil(searchResults.length / routesPerPage);
 
+  // Fix hydration issues by ensuring client-side rendering
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return; // Only fetch data after client-side hydration
+    
     async function fetchRoutes() {
       setLoading(true);
       setError(null);
@@ -40,7 +48,7 @@ export default function HomePage() {
       }
     }
     fetchRoutes();
-  }, []);
+  }, [isClient]);
 
   const handleSearch = ({ origin, destination, date }: { origin: string; destination: string; date: string }) => {
     const filtered = routes.filter(r => {
@@ -93,6 +101,60 @@ export default function HomePage() {
     setBookingConfirmed(false);
   };
 
+  // Don't render dynamic content until client-side hydration is complete
+  if (!isClient) {
+    return (
+      <main className="homepage-main">
+        <header className="homepage-header">
+          <h1>
+            <span role="img" aria-label="bus">🚌</span> Bus & Shuttle Marketplace
+          </h1>
+          <p className="homepage-subtitle">Find, compare, and book your next journey with ease</p>
+        </header>
+        
+        <nav style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+          <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
+          <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
+          <a href="/profile" style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Profile</a>
+        </nav>
+        
+        <section className="homepage-info" style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
+          <h2>About This Website</h2>
+          <p>
+            This portal helps Romanian travelers find and book bus transportation to other countries easily. You can search, compare, and reserve your journey all in one place.
+          </p>
+          <p>
+            For any questions or assistance, call us at <strong>0722 499 563</strong>.
+          </p>
+          <p>
+            <em>This is a project for NCI 2025 Bogdan Munteanu.</em>
+          </p>
+        </section>
+        
+        <section className="homepage-search-section">
+          <div style={{ 
+            background: '#f8f9fa', 
+            padding: 24, 
+            borderRadius: 8, 
+            marginBottom: 24,
+            border: '1px solid #e9ecef'
+          }}>
+            <h2 style={{ marginBottom: 16, color: '#333' }}>Search Routes</h2>
+            <p>Loading search interface...</p>
+          </div>
+        </section>
+        
+        <section className="homepage-content">
+          <p>Loading routes...</p>
+        </section>
+        
+        <footer className="homepage-footer">
+          <p>&copy; 2025 Bus & Shuttle Marketplace. All rights reserved.</p>
+        </footer>
+      </main>
+    );
+  }
+
   return (
     <main className="homepage-main">
       <header className="homepage-header">
@@ -102,7 +164,6 @@ export default function HomePage() {
         <p className="homepage-subtitle">Find, compare, and book your next journey with ease</p>
       </header>
       
-      {/* Simple Navigation without NextAuth for now */}
       <nav style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
         <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
         <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
@@ -121,9 +182,11 @@ export default function HomePage() {
           <em>This is a project for NCI 2025 Bogdan Munteanu.</em>
         </p>
       </section>
+      
       <section className="homepage-search-section">
         <SearchBar onSearch={handleSearch} />
       </section>
+      
       <section className="homepage-content">
         {loading && <p>Loading routes...</p>}
         {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -244,6 +307,7 @@ export default function HomePage() {
           </div>
         )}
       </section>
+      
       <footer className="homepage-footer">
         <p>&copy; {new Date().getFullYear()} Bus & Shuttle Marketplace. All rights reserved.</p>
       </footer>
