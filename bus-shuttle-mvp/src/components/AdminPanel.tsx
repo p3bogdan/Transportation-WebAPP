@@ -60,6 +60,8 @@ const AdminPanel: React.FC = () => {
   const [routeMsg, setRouteMsg] = useState('');
   const [csvMsg, setCsvMsg] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvUpdateFile, setCsvUpdateFile] = useState<File | null>(null);
+  const [csvUpdateMsg, setCsvUpdateMsg] = useState('');
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
@@ -315,20 +317,115 @@ const AdminPanel: React.FC = () => {
     if (e.target.files && e.target.files[0]) setCsvFile(e.target.files[0]);
   };
   const handleCsvImport = async () => {
-    if (!csvFile) return;
+    if (!csvFile) {
+      setCsvMsg('Please select a CSV file first');
+      return;
+    }
+    
+    setCsvMsg('Processing...');
     const formData = new FormData();
     formData.append('file', csvFile);
-    const res = await fetch('/api/routes/import-csv', {
-      method: 'POST',
-      body: formData,
-    });
-    if (res.ok) {
-      setCsvMsg('CSV imported!');
-      setTab('routes'); // reload
-    } else {
+    
+    try {
+      const res = await fetch('/api/routes/import-csv', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await res.json();
+      if (res.ok) {
+        setCsvMsg(result.message);
+        if (result.results.errors.length > 0) {
+          console.warn('Import errors:', result.results.errors);
+        }
+        // Refresh routes data
+        setRouteLoading(true);
+        fetch('/api/routes')
+          .then(res => res.json())
+          .then(data => {
+            setRoutes(data);
+            setRouteLoading(false);
+          });
+        setCsvFile(null);
+        // Reset file input
+        const fileInput = document.querySelector('input[type="file"][accept=".csv"]') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+      } else {
+        setCsvMsg(`Failed to import CSV: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
       setCsvMsg('Failed to import CSV');
     }
   };
+  // CSV export handler
+  const handleCsvExport = async () => {
+    try {
+      const response = await fetch('/api/routes/export-csv');
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `routes_export_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setRouteMsg('Routes exported successfully!');
+      } else {
+        setRouteMsg('Failed to export routes');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      setRouteMsg('Failed to export routes');
+    }
+  };
+  // CSV update handlers
+  const handleCsvUpdateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) setCsvUpdateFile(e.target.files[0]);
+  };
+
+  const handleCsvUpdate = async () => {
+    if (!csvUpdateFile) {
+      setCsvUpdateMsg('Please select a CSV file first');
+      return;
+    }
+    
+    setCsvUpdateMsg('Processing...');
+    const formData = new FormData();
+    formData.append('file', csvUpdateFile);
+    
+    try {
+      const res = await fetch('/api/routes/update-csv', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await res.json();
+      if (res.ok) {
+        setCsvUpdateMsg(result.message);
+        if (result.results.errors.length > 0) {
+          console.warn('Update errors:', result.results.errors);
+        }
+        // Refresh routes data
+        setRouteLoading(true);
+        fetch('/api/routes')
+          .then(res => res.json())
+          .then(data => {
+            setRoutes(data);
+            setRouteLoading(false);
+          });
+      } else {
+        setCsvUpdateMsg(`Failed to update routes: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      setCsvUpdateMsg('Failed to update routes via CSV');
+    }
+  };
+
   // User CRUD handlers
   const handleEditUser = (idx: number) => {
     setEditUserIdx(idx);
@@ -625,6 +722,126 @@ const AdminPanel: React.FC = () => {
       {tab === 'routes' && (
         <div>
           <h3>Routes</h3>
+          
+          {/* CSV Operations Section */}
+          <div style={{ 
+            marginBottom: 24, 
+            padding: 16, 
+            backgroundColor: '#f8f9fa', 
+            border: '1px solid #dee2e6', 
+            borderRadius: 8 
+          }}>
+            <h4 style={{ marginTop: 0, marginBottom: 16 }}>CSV Operations</h4>
+            
+            {/* Export Section */}
+            <div style={{ marginBottom: 16 }}>
+              <h5 style={{ margin: '0 0 8px 0' }}>Export Routes</h5>
+              <button 
+                onClick={handleCsvExport}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer'
+                }}
+              >
+                Export to CSV
+              </button>
+            </div>
+            
+            {/* Import Section */}
+            <div style={{ marginBottom: 16 }}>
+              <h5 style={{ margin: '0 0 8px 0' }}>Add Routes via CSV</h5>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleCsvChange}
+                  style={{ marginRight: 8 }}
+                />
+                <button 
+                  onClick={handleCsvImport} 
+                  disabled={!csvFile}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: csvFile ? '#007bff' : '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: csvFile ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Import CSV
+                </button>
+              </div>
+              {csvMsg && (
+                <div style={{ 
+                  marginTop: 8, 
+                  padding: 8, 
+                  backgroundColor: csvMsg.includes('Failed') ? '#f8d7da' : '#d4edda',
+                  color: csvMsg.includes('Failed') ? '#721c24' : '#155724',
+                  borderRadius: 4,
+                  fontSize: 14
+                }}>
+                  {csvMsg}
+                </div>
+              )}
+            </div>
+            
+            {/* Update Section */}
+            <div>
+              <h5 style={{ margin: '0 0 8px 0' }}>Update Routes via CSV</h5>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleCsvUpdateChange}
+                  style={{ marginRight: 8 }}
+                />
+                <button 
+                  onClick={handleCsvUpdate} 
+                  disabled={!csvUpdateFile}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: csvUpdateFile ? '#ffc107' : '#6c757d',
+                    color: csvUpdateFile ? '#212529' : 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: csvUpdateFile ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Update via CSV
+                </button>
+              </div>
+              {csvUpdateMsg && (
+                <div style={{ 
+                  marginTop: 8, 
+                  padding: 8, 
+                  backgroundColor: csvUpdateMsg.includes('Failed') ? '#f8d7da' : '#d4edda',
+                  color: csvUpdateMsg.includes('Failed') ? '#721c24' : '#155724',
+                  borderRadius: 4,
+                  fontSize: 14
+                }}>
+                  {csvUpdateMsg}
+                </div>
+              )}
+            </div>
+            
+            {/* CSV Format Help */}
+            <div style={{ marginTop: 16, fontSize: 12, color: '#6c757d' }}>
+              <strong>CSV Format Help:</strong>
+              <br />
+              <strong>For Import:</strong> provider, departure, arrival, departureTime, arrivalTime, price, seats, vehicleType
+              <br />
+              <strong>For Update:</strong> id (required), plus any fields you want to update from the import list
+              <br />
+              <strong>Date Format:</strong> YYYY-MM-DDTHH:MM:SS.sssZ (ISO 8601)
+            </div>
+          </div>
+
+          {/* Existing Routes Table */}
           {routeLoading ? (
             <p>Loading routes...</p>
           ) : routes.length === 0 ? (
@@ -704,10 +921,6 @@ const AdminPanel: React.FC = () => {
             <button type="submit">Add</button>
           </form>
           {routeMsg && <div style={{ color: 'green', marginTop: 8 }}>{routeMsg}</div>}
-          <h4 style={{ marginTop: 32 }}>Import Routes via CSV</h4>
-          <input type="file" accept=".csv" onChange={handleCsvChange} />
-          <button onClick={handleCsvImport} disabled={!csvFile}>Import CSV</button>
-          {csvMsg && <div style={{ color: 'green', marginTop: 8 }}>{csvMsg}</div>}
         </div>
       )}
       {tab === 'users' && (
