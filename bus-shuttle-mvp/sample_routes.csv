@@ -1,5 +1,5 @@
 provider,departure,arrival,departureTime,arrivalTime,price,seats,vehicleType
-FlixBus,Bucharest,Vienna,2024-02-01T08:00:00.000Z,2024-02-01T18:00:00.000Z,45.99,50,Bus
-RegioJet,Bucharest,Prague,2024-02-02T09:00:00.000Z,2024-02-02T20:00:00.000Z,52.50,45,Coach
-Eurolines,Bucharest,Budapest,2024-02-03T07:30:00.000Z,2024-02-03T15:30:00.000Z,38.00,40,Bus
-TransDev,Cluj-Napoca,Vienna,2024-02-04T10:00:00.000Z,2024-02-04T19:00:00.000Z,42.75,35,Minibus
+FlixBus,Bucharest,Vienna,2025-07-30T08:00:00.000Z,2025-07-30T18:00:00.000Z,45.99,50,Bus
+RegioJet,Bucharest,Prague,2025-07-31T09:00:00.000Z,2025-07-31T20:00:00.000Z,52.50,45,Coach
+Eurolines,Bucharest,Budapest,2025-08-01T07:30:00.000Z,2025-08-01T15:30:00.000Z,38.00,40,Bus
+TransDev,Cluj-Napoca,Vienna,2025-08-02T10:00:00.000Z,2025-08-02T19:00:00.000Z,42.75,35,Minibus

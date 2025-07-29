@@ -43,6 +43,7 @@ model User {
   name      String
   email     String    @unique
   phone     String?
+  password  String?   // Added for authentication
   createdAt DateTime  @default(now())
   updatedAt DateTime
   Booking   Booking[]

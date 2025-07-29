@@ -16,6 +16,7 @@ export default function HomePage() {
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bookingData, setBookingData] = useState<{ name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string } | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -71,10 +72,11 @@ export default function HomePage() {
     setBookingMode(true);
   };
 
-  const handleConfirmBooking = (data: { name: string; email: string; phone: string; pickupAddress: string }) => {
+  const handleConfirmBooking = (data: { name: string; email: string; phone: string; pickupAddress: string; paymentMethod: string }) => {
     setBookingConfirmed(true);
     setBookingMode(false);
-    // Here you would call the booking API and send email/SMS
+    setBookingData(data);
+    console.log('Booking confirmed with data:', data);
   };
 
   // Get routes for current page
@@ -99,10 +101,14 @@ export default function HomePage() {
         </h1>
         <p className="homepage-subtitle">Find, compare, and book your next journey with ease</p>
       </header>
+      
+      {/* Simple Navigation without NextAuth for now */}
       <nav style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
         <a href="/" style={{ padding: '8px 16px', background: '#1976d2', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Home</a>
         <a href="/admin" style={{ padding: '8px 16px', background: '#333', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Admin</a>
+        <a href="/profile" style={{ padding: '8px 16px', background: '#17a2b8', color: '#fff', borderRadius: 4, textDecoration: 'none', fontWeight: 500 }}>Profile</a>
       </nav>
+      
       <section className="homepage-info" style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
         <h2>About This Website</h2>
         <p>
@@ -147,10 +153,94 @@ export default function HomePage() {
         {bookingMode && selectedRoute && !bookingConfirmed && (
           <BookingForm route={selectedRoute} onConfirm={handleConfirmBooking} />
         )}
-        {bookingConfirmed && (
-          <div className="booking-confirmed">
-            <h3>Booking Confirmed!</h3>
-            <p>Your booking reference and confirmation will be sent via email/SMS.</p>
+        {bookingConfirmed && selectedRoute && bookingData && (
+          <div style={{ 
+            maxWidth: 600, 
+            margin: '0 auto', 
+            padding: 32, 
+            border: '2px solid #28a745', 
+            borderRadius: 12,
+            backgroundColor: '#d4edda',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+            <h2 style={{ color: '#155724', margin: '0 0 16px 0' }}>Booking Confirmed!</h2>
+            <p style={{ color: '#155724', marginBottom: 24, fontSize: 18 }}>
+              Thank you for your booking. Your trip has been successfully reserved!
+            </p>
+            
+            <div style={{ 
+              backgroundColor: 'white', 
+              padding: 20, 
+              borderRadius: 8, 
+              textAlign: 'left',
+              marginBottom: 24
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#333' }}>Booking Details</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 14 }}>
+                <div><strong>Passenger:</strong> {bookingData.name}</div>
+                <div><strong>Email:</strong> {bookingData.email}</div>
+                <div><strong>Phone:</strong> {bookingData.phone}</div>
+                <div><strong>Pickup:</strong> {bookingData.pickupAddress}</div>
+                <div><strong>Route:</strong> {selectedRoute.departure} → {selectedRoute.arrival}</div>
+                <div><strong>Price:</strong> €{selectedRoute.price}</div>
+                <div><strong>Payment:</strong> {bookingData.paymentMethod === 'cash' ? 'Pay on Board' : 'Card Payment'}</div>
+                <div><strong>Provider:</strong> {selectedRoute.provider}</div>
+              </div>
+            </div>
+            
+            <div style={{ 
+              backgroundColor: '#fff3cd', 
+              border: '1px solid #ffeaa7',
+              padding: 16, 
+              borderRadius: 8,
+              marginBottom: 24,
+              textAlign: 'left'
+            }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#856404' }}>Important Information</h4>
+              <ul style={{ margin: 0, paddingLeft: 20, color: '#856404', fontSize: 14 }}>
+                <li>Please arrive 15 minutes before departure</li>
+                <li>Bring a valid ID for international travel</li>
+                <li>Confirmation details will be sent to your email</li>
+                <li>For support, call: <strong>0722 499 563</strong></li>
+              </ul>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button 
+                onClick={() => {
+                  setBookingConfirmed(false);
+                  setBookingMode(false);
+                  setSelectedRoute(null);
+                  setBookingData(null);
+                }}
+                style={{ 
+                  padding: '12px 24px', 
+                  backgroundColor: '#1976d2', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Book Another Trip
+              </button>
+              <a 
+                href="/profile" 
+                style={{ 
+                  padding: '12px 24px', 
+                  backgroundColor: '#17a2b8', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                  fontWeight: 'bold'
+                }}
+              >
+                View My Bookings
+              </a>
+            </div>
           </div>
         )}
       </section>
