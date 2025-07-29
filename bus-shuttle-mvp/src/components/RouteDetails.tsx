@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Route } from '../utils/types';
 
 interface RouteDetailsProps {
@@ -7,6 +8,8 @@ interface RouteDetailsProps {
 }
 
 const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => {
+  const router = useRouter();
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
       weekday: 'long',
@@ -19,8 +22,8 @@ const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => {
   };
 
   const calculateDuration = () => {
-    const departure = new Date(route.departureTime || route.departure);
-    const arrival = new Date(route.arrivalTime || route.arrival);
+    const departure = new Date(route.departureTime);
+    const arrival = new Date(route.arrivalTime);
     const durationMs = arrival.getTime() - departure.getTime();
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -74,7 +77,7 @@ const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => {
             {route.departure}
           </p>
           <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
-            {route.departureTime ? formatDate(route.departureTime) : formatDate(route.departure)}
+            {formatDate(route.departureTime)}
           </p>
         </div>
 
@@ -86,7 +89,7 @@ const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => {
             {route.arrival}
           </p>
           <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
-            {route.arrivalTime ? formatDate(route.arrivalTime) : 'TBD'}
+            {formatDate(route.arrivalTime)}
           </p>
         </div>
       </div>
@@ -125,6 +128,19 @@ const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => {
         </div>
       </div>
 
+      {/* Stops Information */}
+      {route.stops && route.stops.length > 0 && (
+        <div style={{ 
+          backgroundColor: '#f8f9fa', 
+          padding: 16, 
+          borderRadius: 6, 
+          marginBottom: 24 
+        }}>
+          <strong style={{ color: '#555' }}>Stops:</strong>
+          <p style={{ margin: '4px 0 0 0' }}>{route.stops.join(' → ')}</p>
+        </div>
+      )}
+
       {/* Price and Booking */}
       <div style={{ 
         display: 'flex', 
@@ -149,7 +165,7 @@ const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBook }) => {
         
         <div style={{ display: 'flex', gap: 12 }}>
           <button 
-            onClick={() => window.history.back()}
+            onClick={() => router.push('/')}
             style={{ 
               padding: '12px 24px', 
               backgroundColor: '#6c757d', 
