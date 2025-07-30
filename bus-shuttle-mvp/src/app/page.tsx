@@ -23,6 +23,17 @@ export default function HomePage() {
   const [statistics, setStatistics] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
+  // Modal state for account creation
+  const [showModal, setShowModal] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [modalForm, setModalForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: ''
+  });
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const routesPerPage = 10;
@@ -124,6 +135,69 @@ export default function HomePage() {
     setSelectedRoute(null);
     setBookingMode(false);
     setBookingConfirmed(false);
+  };
+
+  // Handle modal registration
+  const handleModalRegistration = async () => {
+    setModalLoading(true);
+    setModalError('');
+    
+    // Basic validation
+    if (!modalForm.name || !modalForm.email || !modalForm.password) {
+      setModalError('Please fill in all required fields');
+      setModalLoading(false);
+      return;
+    }
+
+    if (modalForm.password.length < 6) {
+      setModalError('Password must be at least 6 characters long');
+      setModalLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(modalForm),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed. Please try again.');
+      }
+      
+      // Auto-login after successful registration
+      const { signIn } = await import('next-auth/react');
+      const result = await signIn('credentials', {
+        email: modalForm.email,
+        password: modalForm.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setModalError('Account created but login failed. Please sign in manually.');
+      } else {
+        // Close modal and redirect to profile
+        setShowModal(false);
+        setModalForm({ name: '', email: '', phone: '', password: '' });
+        window.location.href = '/profile';
+      }
+    } catch (error: any) {
+      setModalError(error.message);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // Close modal function
+  const closeModal = () => {
+    setShowModal(false);
+    setModalError('');
+    setModalForm({ name: '', email: '', phone: '', password: '' });
   };
 
   // Don't render dynamic content until client-side hydration is complete
@@ -551,25 +625,183 @@ export default function HomePage() {
                   View My Bookings
                 </a>
               ) : (
-                <a 
-                  href="/auth/signin"
+                <button 
+                  onClick={() => setShowModal(true)}
                   style={{ 
                     padding: '12px 24px', 
                     backgroundColor: '#28a745', 
                     color: 'white', 
                     border: 'none', 
                     borderRadius: 6,
-                    textDecoration: 'none',
+                    cursor: 'pointer',
                     fontWeight: 'bold'
                   }}
                 >
                   Create Account to Track Bookings
-                </a>
+                </button>
               )}
             </div>
           </div>
         )}
       </section>
+      
+      {/* Account Creation Modal */}
+      {showModal && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0, 0, 0, 0.7)', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            background: 'white', 
+            borderRadius: 8, 
+            padding: 32, 
+            maxWidth: 400, 
+            width: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+          }}>
+            <h2 style={{ margin: '0 0 16px 0', color: '#333', fontSize: 24, textAlign: 'center' }}>
+              🚌 Create Your Account
+            </h2>
+            <p style={{ margin: '0 0 24px 0', color: '#666', textAlign: 'center' }}>
+              Join to track your bookings and manage your trips
+            </p>
+            
+            {modalError && (
+              <div style={{ 
+                backgroundColor: '#f8d7da', 
+                color: '#721c24', 
+                padding: 12, 
+                borderRadius: 4, 
+                marginBottom: 16,
+                fontSize: 14,
+                border: '1px solid #f5c6cb'
+              }}>
+                {modalError}
+              </div>
+            )}
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+              <input 
+                type="text" 
+                placeholder="Full Name *" 
+                value={modalForm.name}
+                onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                style={{ 
+                  padding: 12, 
+                  borderRadius: 4, 
+                  border: '1px solid #ced4da',
+                  fontSize: 16,
+                  boxSizing: 'border-box'
+                }}
+              />
+              <input 
+                type="email" 
+                placeholder="Email Address *" 
+                value={modalForm.email}
+                onChange={(e) => setModalForm({ ...modalForm, email: e.target.value })}
+                style={{ 
+                  padding: 12, 
+                  borderRadius: 4, 
+                  border: '1px solid #ced4da',
+                  fontSize: 16,
+                  boxSizing: 'border-box'
+                }}
+              />
+              <input 
+                type="tel" 
+                placeholder="Phone Number (optional)" 
+                value={modalForm.phone}
+                onChange={(e) => setModalForm({ ...modalForm, phone: e.target.value })}
+                style={{ 
+                  padding: 12, 
+                  borderRadius: 4, 
+                  border: '1px solid #ced4da',
+                  fontSize: 16,
+                  boxSizing: 'border-box'
+                }}
+              />
+              <input 
+                type="password" 
+                placeholder="Password (min 6 characters) *" 
+                value={modalForm.password}
+                onChange={(e) => setModalForm({ ...modalForm, password: e.target.value })}
+                style={{ 
+                  padding: 12, 
+                  borderRadius: 4, 
+                  border: '1px solid #ced4da',
+                  fontSize: 16,
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button 
+                onClick={handleModalRegistration}
+                disabled={modalLoading}
+                style={{ 
+                  flex: 1,
+                  padding: '14px 20px', 
+                  backgroundColor: modalLoading ? '#ccc' : '#28a745', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 6,
+                  cursor: modalLoading ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: 16
+                }}
+              >
+                {modalLoading ? 'Creating...' : 'Create Account'}
+              </button>
+              
+              <button 
+                onClick={closeModal}
+                disabled={modalLoading}
+                style={{ 
+                  flex: 1,
+                  padding: '14px 20px', 
+                  backgroundColor: '#6c757d', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 6,
+                  cursor: modalLoading ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: 16
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+            
+            <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid #eee' }}>
+              <p style={{ margin: '0 0 8px 0', color: '#666', fontSize: 14 }}>
+                Already have an account?
+              </p>
+              <a 
+                href="/auth/signin"
+                style={{
+                  color: '#1976d2',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                  fontWeight: 'bold'
+                }}
+              >
+                Sign In Instead
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
       
       <footer className="homepage-footer">
         <p>&copy; {new Date().getFullYear()} Bus & Shuttle Marketplace. All rights reserved.</p>

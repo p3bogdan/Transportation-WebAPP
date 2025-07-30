@@ -20,10 +20,40 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'User already exists' },
-        { status: 400 }
-      );
+      // If user exists but has no password, allow them to set one
+      if (!existingUser.password) {
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(password, 12);
+        
+        // Update the existing user with password and any new info
+        const updatedUser = await prisma.user.update({
+          where: { email },
+          data: {
+            password: hashedPassword,
+            name: name || existingUser.name, // Use provided name or keep existing
+            phone: phone || existingUser.phone, // Use provided phone or keep existing
+            updatedAt: new Date(),
+          },
+        });
+
+        return NextResponse.json(
+          { 
+            message: 'Password added to your existing account successfully',
+            user: {
+              id: updatedUser.id,
+              name: updatedUser.name,
+              email: updatedUser.email,
+            }
+          },
+          { status: 200 }
+        );
+      } else {
+        // User exists and already has a password
+        return NextResponse.json(
+          { error: 'An account with this email address already exists. Please sign in instead.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Hash password

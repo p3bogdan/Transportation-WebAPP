@@ -47,6 +47,38 @@ const handler = NextAuth({
   pages: {
     signIn: '/auth/signin',
   },
+  callbacks: {
+    async signIn({ user, account, profile }) {
+      return true;
+    },
+    async redirect({ url, baseUrl }) {
+      // Redirect to profile page after successful sign-in
+      if (url === baseUrl || url === `${baseUrl}/`) {
+        return `${baseUrl}/profile`;
+      }
+      // Allow relative callback URLs
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      // Allow callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      return `${baseUrl}/profile`;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id;
+      }
+      return session;
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+  },
 });
 
 export { handler as GET, handler as POST };
