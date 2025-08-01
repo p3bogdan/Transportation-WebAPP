@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useSession } from 'next-auth/react';
+import { sanitizeName, sanitizeEmail, sanitizePhone, sanitizeAddress, sanitizeHtml } from '@/utils/sanitization';
 
 interface Route {
   id?: number;
@@ -37,10 +38,33 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
 
   const validate = () => {
     const newErrors: typeof errors = {};
-    if (!name || name.length > 60) newErrors.name = 'Name is required and must be ≤ 60 characters.';
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) newErrors.email = 'Enter a valid email address.';
-    if (!phone || !/^\+\d{8,15}$/.test(phone)) newErrors.phone = 'Enter a valid international phone number (e.g. +40712345678).';
-    if (!pickupAddress || pickupAddress.length > 90) newErrors.pickupAddress = 'Pickup city is required and must be ≤ 90 characters.';
+    
+    // Sanitize inputs before validation
+    const sanitizedName = sanitizeName(name);
+    const sanitizedEmail = sanitizeEmail(email);
+    const sanitizedPhone = sanitizePhone(phone);
+    const sanitizedPickupAddress = sanitizeAddress(pickupAddress);
+    
+    // Update state with sanitized values
+    setName(sanitizedName);
+    setEmail(sanitizedEmail);
+    setPhone(sanitizedPhone);
+    setPickupAddress(sanitizedPickupAddress);
+    
+    // Validate sanitized data
+    if (!sanitizedName || sanitizedName.length < 2 || sanitizedName.length > 60) {
+      newErrors.name = 'Name is required and must be between 2-60 characters.';
+    }
+    if (!sanitizedEmail || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(sanitizedEmail)) {
+      newErrors.email = 'Enter a valid email address.';
+    }
+    if (!sanitizedPhone || !/^\+\d{8,15}$/.test(sanitizedPhone)) {
+      newErrors.phone = 'Enter a valid international phone number (e.g. +40712345678).';
+    }
+    if (!sanitizedPickupAddress || sanitizedPickupAddress.length < 2 || sanitizedPickupAddress.length > 90) {
+      newErrors.pickupAddress = 'Pickup address is required and must be between 2-90 characters.';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -59,10 +83,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          email,
-          phone,
-          pickupAddress,
+          name: sanitizeName(name),
+          email: sanitizeEmail(email),
+          phone: sanitizePhone(phone),
+          pickupAddress: sanitizeAddress(pickupAddress),
           paymentMethod,
           route: {
             id: route.id,
@@ -85,13 +109,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
       const bookingData = await res.json();
       console.log('Booking created successfully:', bookingData);
       
-      onConfirm({ name, email, phone, pickupAddress, paymentMethod });
+      onConfirm({ 
+        name: sanitizeName(name), 
+        email: sanitizeEmail(email), 
+        phone: sanitizePhone(phone), 
+        pickupAddress: sanitizeAddress(pickupAddress), 
+        paymentMethod 
+      });
     } catch (err: any) {
       console.error('Booking error:', err);
-      setSubmitError(err.message || 'Booking failed');
+      setSubmitError(sanitizeHtml(err.message || 'Booking failed'));
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Input change handlers with real-time sanitization
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeName(e.target.value);
+    setName(sanitized);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeEmail(e.target.value);
+    setEmail(sanitized);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizePhone(e.target.value);
+    setPhone(sanitized);
+  };
+
+  const handlePickupAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeAddress(e.target.value);
+    setPickupAddress(sanitized);
   };
 
   return (
@@ -104,7 +155,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
           placeholder="Your Name"
           value={name}
           maxLength={60}
-          onChange={e => setName(e.target.value)}
+          onChange={handleNameChange}
           required
           style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
         />
@@ -114,7 +165,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
           type="email"
           placeholder="Email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={handleEmailChange}
           required
           disabled={!!session?.user?.email}
           style={{ 
@@ -130,8 +181,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
           type="tel"
           placeholder="Phone (e.g. +40712345678)"
           value={phone}
-          maxLength={16}
-          onChange={e => setPhone(e.target.value)}
+          maxLength={20}
+          onChange={handlePhoneChange}
           required
           style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
         />
@@ -142,7 +193,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
           placeholder="Pickup Address"
           value={pickupAddress}
           maxLength={90}
-          onChange={e => setPickupAddress(e.target.value)}
+          onChange={handlePickupAddressChange}
           required
           style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
         />
@@ -198,10 +249,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
         {paymentMethod === 'card' && (
           <Elements stripe={stripePromise}>
             <StripeCardSection
-              name={name}
-              email={email}
-              phone={phone}
-              pickupAddress={pickupAddress}
+              name={sanitizeName(name)}
+              email={sanitizeEmail(email)}
+              phone={sanitizePhone(phone)}
+              pickupAddress={sanitizeAddress(pickupAddress)}
               route={route}
               submitting={submitting}
               setSubmitting={setSubmitting}
@@ -224,12 +275,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
           </div>
         )}
       </form>
-      
+
+      {/* Booking Overview */}
       <div style={{ border: '1px solid #e0e0e0', borderRadius: 8, padding: 16, minWidth: 280, background: '#fafbfc', height: 'fit-content' }}>
         <h3 style={{ margin: '0 0 16px 0', color: '#333' }}>Booking Overview</h3>
         <div style={{ marginBottom: 12 }}>
           <strong>Route:</strong><br />
-          <span style={{ color: '#1976d2', fontSize: 18 }}>{route.departure} → {route.arrival}</span>
+          <span style={{ color: '#1976d2', fontSize: 18 }}>{sanitizeHtml(route.departure)} → {sanitizeHtml(route.arrival)}</span>
         </div>
         <div style={{ marginBottom: 12 }}>
           <strong>Price:</strong><br />
@@ -241,11 +293,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ route, onConfirm, isGuest = f
         </div>
         <div style={{ marginBottom: 12 }}>
           <strong>Company:</strong><br />
-          {route.provider}
+          {sanitizeHtml(route.provider)}
         </div>
         <div>
           <strong>Vehicle:</strong><br />
-          {route.vehicleType || 'Bus'}
+          {sanitizeHtml(route.vehicleType || 'Bus')}
         </div>
       </div>
     </div>
@@ -302,20 +354,26 @@ const StripeCardSection: React.FC<{
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name,
-            email,
-            phone,
-            pickupAddress,
+            name: sanitizeName(name),
+            email: sanitizeEmail(email),
+            phone: sanitizePhone(phone),
+            pickupAddress: sanitizeAddress(pickupAddress),
             paymentMethod: 'card',
             route,
             paymentStatus: result.paymentIntent.status,
           }),
         });
         setCardPaid(true);
-        onConfirm({ name, email, phone, pickupAddress, paymentMethod: 'card' });
+        onConfirm({ 
+          name: sanitizeName(name), 
+          email: sanitizeEmail(email), 
+          phone: sanitizePhone(phone), 
+          pickupAddress: sanitizeAddress(pickupAddress), 
+          paymentMethod: 'card' 
+        });
       }
     } catch (err: any) {
-      setSubmitError(err.message || 'Unknown error');
+      setSubmitError(sanitizeHtml(err.message || 'Unknown error'));
     } finally {
       setSubmitting(false);
     }

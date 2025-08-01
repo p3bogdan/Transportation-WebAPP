@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { sanitizeUserData, sanitizeName, sanitizeEmail, sanitizePhone, sanitizeAddress, sanitizeNumber, sanitizeHtml, sanitizeFileName, sanitizeCsvContent } from '@/utils/sanitization';
 
 interface Booking {
   id: number;
@@ -88,29 +89,20 @@ const AdminPanel: React.FC = () => {
     dateTo: '',
   });
 
+  // Load data based on active tab
   useEffect(() => {
     if (tab === 'bookings') {
       setLoading(true);
       fetch('/api/bookings')
         .then(res => res.json())
         .then(data => {
-          const bookingsData = data.map((b: any) => ({
-            id: b.id,
-            user: b.User?.name || '-',
-            routeId: b.routeId,
-            date: b.route?.departureTime || '-',
-            createdAt: b.createdAt,
-            pickupAddress: b.route?.departure || '-',
-            destination: b.route?.arrival || '-',
-            email: b.User?.email || '-',
-            phone: b.User?.phone || '-',
-            company: b.route?.provider || '-',
-            paymentStatus: b.paymentStatus || '-',
-          }));
-          setBookings(bookingsData);
-          setFilteredBookings(bookingsData); // Initialize filtered bookings
+          setBookings(data);
+          setFilteredBookings(data);
           setLoading(false);
         });
+      fetch('/api/companies')
+        .then(res => res.json())
+        .then(data => setCompanies(data));
     } else if (tab === 'addCompany') {
       setCompanyLoading(true);
       fetch('/api/companies')
@@ -182,9 +174,33 @@ const AdminPanel: React.FC = () => {
     setEditIdx(idx);
     setEditBooking(bookings[idx]);
   };
+
   const handleEditChange = (field: keyof Booking, value: string) => {
-    setEditBooking(prev => ({ ...prev, [field]: value }));
+    // Sanitize input based on field type
+    let sanitizedValue = value;
+    switch (field) {
+      case 'user':
+        sanitizedValue = sanitizeName(value);
+        break;
+      case 'email':
+        sanitizedValue = sanitizeEmail(value);
+        break;
+      case 'phone':
+        sanitizedValue = sanitizePhone(value);
+        break;
+      case 'pickupAddress':
+      case 'destination':
+        sanitizedValue = sanitizeAddress(value);
+        break;
+      case 'company':
+        sanitizedValue = sanitizeName(value);
+        break;
+      default:
+        sanitizedValue = sanitizeHtml(value);
+    }
+    setEditBooking(prev => ({ ...prev, [field]: sanitizedValue }));
   };
+
   const handleEditSave = async (id: number) => {
     // Save booking changes to the backend
     const res = await fetch('/api/bookings', {
@@ -201,6 +217,7 @@ const AdminPanel: React.FC = () => {
       alert('Failed to update booking');
     }
   };
+
   const handleDeleteBooking = async (id: number) => {
     if (!confirm('Are you sure you want to delete this booking?')) return;
     const res = await fetch('/api/bookings', {
@@ -214,13 +231,23 @@ const AdminPanel: React.FC = () => {
       alert('Failed to delete booking');
     }
   };
+
   const handleEditCompany = (idx: number) => {
     setEditCompanyIdx(idx);
     setEditCompany(companies[idx]);
   };
+
   const handleEditCompanyChange = (field: string, value: string) => {
-    setEditCompany((prev: any) => ({ ...prev, [field]: value }));
+    // Sanitize company input
+    let sanitizedValue = value;
+    if (field === 'name') {
+      sanitizedValue = sanitizeName(value);
+    } else if (field === 'phone') {
+      sanitizedValue = sanitizePhone(value);
+    }
+    setEditCompany((prev: any) => ({ ...prev, [field]: sanitizedValue }));
   };
+
   const handleEditCompanySave = async (id: number) => {
     await fetch('/api/companies', {
       method: 'PATCH',
@@ -231,13 +258,21 @@ const AdminPanel: React.FC = () => {
     setEditCompanyIdx(null);
     setEditCompany({});
   };
+
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setCompanyMsg('');
+    
+    const sanitizedName = sanitizeName(companyName);
+    if (!sanitizedName || sanitizedName.length < 2) {
+      setCompanyMsg('Company name must be at least 2 characters');
+      return;
+    }
+
     const res = await fetch('/api/companies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: companyName }),
+      body: JSON.stringify({ name: sanitizedName }),
     });
     if (res.ok) {
       const newCompany = await res.json();
@@ -248,14 +283,38 @@ const AdminPanel: React.FC = () => {
       setCompanyMsg('Failed to add company');
     }
   };
-  // Route CRUD handlers
+
+  // Route CRUD handlers with sanitization
   const handleEditRoute = (idx: number) => {
     setEditRouteIdx(idx);
     setEditRoute(routes[idx]);
   };
+
   const handleEditRouteChange = (field: keyof Route, value: any) => {
-    setEditRoute(prev => ({ ...prev, [field]: value }));
+    // Sanitize route input based on field type
+    let sanitizedValue = value;
+    switch (field) {
+      case 'origin':
+      case 'destination':
+      case 'departure':
+      case 'arrival':
+        sanitizedValue = sanitizeAddress(String(value));
+        break;
+      case 'provider':
+        sanitizedValue = sanitizeName(String(value));
+        break;
+      case 'price':
+        sanitizedValue = sanitizeNumber(value, 0, 10000);
+        break;
+      case 'companyId':
+        sanitizedValue = sanitizeNumber(value, 1);
+        break;
+      default:
+        sanitizedValue = sanitizeHtml(String(value));
+    }
+    setEditRoute(prev => ({ ...prev, [field]: sanitizedValue }));
   };
+
   const handleEditRouteSave = async (id: number) => {
     const res = await fetch('/api/routes', {
       method: 'PATCH',
@@ -271,6 +330,7 @@ const AdminPanel: React.FC = () => {
       setRouteMsg('Failed to update route');
     }
   };
+
   const handleDeleteRoute = async (id: number) => {
     if (!confirm('Are you sure you want to delete this route?')) return;
     const res = await fetch('/api/routes', {
@@ -285,23 +345,32 @@ const AdminPanel: React.FC = () => {
       setRouteMsg('Failed to delete route');
     }
   };
+
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
     setRouteMsg('');
-    // Map form fields to API fields
-    const routeToSend = {
-      departure: editRoute.origin || '',
-      arrival: editRoute.destination || '',
+    
+    // Sanitize and validate route data
+    const sanitizedRoute = {
+      departure: sanitizeAddress(editRoute.origin || ''),
+      arrival: sanitizeAddress(editRoute.destination || ''),
       departureTime: editRoute.departure ? new Date(editRoute.departure).toISOString() : '',
       arrivalTime: editRoute.arrival ? new Date(editRoute.arrival).toISOString() : '',
-      price: editRoute.price,
-      provider: editRoute.provider,
-      companyId: editRoute.companyId,
+      price: sanitizeNumber(editRoute.price || 0, 0, 10000),
+      provider: sanitizeName(editRoute.provider || ''),
+      companyId: editRoute.companyId ? sanitizeNumber(editRoute.companyId, 1) : null,
     };
+
+    // Validation
+    if (!sanitizedRoute.departure || !sanitizedRoute.arrival || !sanitizedRoute.provider) {
+      setRouteMsg('Please fill in all required fields');
+      return;
+    }
+
     const res = await fetch('/api/routes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(routeToSend),
+      body: JSON.stringify(sanitizedRoute),
     });
     if (res.ok) {
       const newRoute = await res.json();
@@ -312,10 +381,21 @@ const AdminPanel: React.FC = () => {
       setRouteMsg('Failed to add route');
     }
   };
-  // CSV import handler
+
+  // CSV import handler with sanitization
   const handleCsvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) setCsvFile(e.target.files[0]);
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Sanitize filename
+      const sanitizedName = sanitizeFileName(file.name);
+      if (!sanitizedName.endsWith('.csv')) {
+        setCsvMsg('Please select a valid CSV file');
+        return;
+      }
+      setCsvFile(file);
+    }
   };
+
   const handleCsvImport = async () => {
     if (!csvFile) {
       setCsvMsg('Please select a CSV file first');
@@ -334,7 +414,7 @@ const AdminPanel: React.FC = () => {
       
       const result = await res.json();
       if (res.ok) {
-        setCsvMsg(result.message);
+        setCsvMsg(sanitizeHtml(result.message));
         if (result.results.errors.length > 0) {
           console.warn('Import errors:', result.results.errors);
         }
@@ -346,18 +426,15 @@ const AdminPanel: React.FC = () => {
             setRoutes(data);
             setRouteLoading(false);
           });
-        setCsvFile(null);
-        // Reset file input
-        const fileInput = document.querySelector('input[type="file"][accept=".csv"]') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
       } else {
-        setCsvMsg(`Failed to import CSV: ${result.error}`);
+        setCsvMsg(`Failed to import routes: ${sanitizeHtml(result.error)}`);
       }
     } catch (error) {
       console.error('Import error:', error);
-      setCsvMsg('Failed to import CSV');
+      setCsvMsg('Failed to import routes via CSV');
     }
   };
+
   // CSV export handler
   const handleCsvExport = async () => {
     try {
@@ -426,14 +503,33 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // User CRUD handlers
+  // User CRUD handlers with sanitization
   const handleEditUser = (idx: number) => {
     setEditUserIdx(idx);
     setEditUser({ ...users[idx], password: '' });
   };
 
   const handleEditUserChange = (field: keyof (User & { password?: string }), value: string) => {
-    setEditUser(prev => ({ ...prev, [field]: value }));
+    // Sanitize user input based on field type
+    let sanitizedValue = value;
+    switch (field) {
+      case 'name':
+        sanitizedValue = sanitizeName(value);
+        break;
+      case 'email':
+        sanitizedValue = sanitizeEmail(value);
+        break;
+      case 'phone':
+        sanitizedValue = sanitizePhone(value);
+        break;
+      case 'password':
+        // Don't sanitize passwords, just limit length
+        sanitizedValue = value.substring(0, 128);
+        break;
+      default:
+        sanitizedValue = sanitizeHtml(value);
+    }
+    setEditUser(prev => ({ ...prev, [field]: sanitizedValue }));
   };
 
   const handleEditUserSave = async (id: number) => {
@@ -451,7 +547,7 @@ const AdminPanel: React.FC = () => {
       setUserMsg('User updated successfully!');
     } else {
       const error = await res.json();
-      setUserMsg(`Failed to update user: ${error.error}`);
+      setUserMsg(`Failed to update user: ${sanitizeHtml(error.error)}`);
     }
   };
 
@@ -469,7 +565,7 @@ const AdminPanel: React.FC = () => {
       setUserMsg('User deleted successfully!');
     } else {
       const error = await res.json();
-      setUserMsg(`Failed to delete user: ${error.error}`);
+      setUserMsg(`Failed to delete user: ${sanitizeHtml(error.error)}`);
     }
   };
 
@@ -477,10 +573,34 @@ const AdminPanel: React.FC = () => {
     e.preventDefault();
     setUserMsg('');
     
+    // Sanitize new user data
+    const sanitizedUserData = {
+      name: sanitizeName(newUser.name),
+      email: sanitizeEmail(newUser.email),
+      phone: sanitizePhone(newUser.phone),
+      password: newUser.password // Don't sanitize password
+    };
+
+    // Validation
+    if (!sanitizedUserData.name || sanitizedUserData.name.length < 2) {
+      setUserMsg('Name must be at least 2 characters');
+      return;
+    }
+
+    if (!sanitizedUserData.email || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(sanitizedUserData.email)) {
+      setUserMsg('Valid email address is required');
+      return;
+    }
+
+    if (sanitizedUserData.password && sanitizedUserData.password.length < 6) {
+      setUserMsg('Password must be at least 6 characters if provided');
+      return;
+    }
+    
     const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUser),
+      body: JSON.stringify(sanitizedUserData),
     });
     
     if (res.ok) {
@@ -490,8 +610,41 @@ const AdminPanel: React.FC = () => {
       setUserMsg('User created successfully!');
     } else {
       const error = await res.json();
-      setUserMsg(`Failed to create user: ${error.error}`);
+      setUserMsg(`Failed to create user: ${sanitizeHtml(error.error)}`);
     }
+  };
+
+  // Input change handlers with sanitization
+  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeName(e.target.value);
+    setCompanyName(sanitized);
+  };
+
+  const handleBookingFilterChange = (field: string, value: string) => {
+    let sanitizedValue = value;
+    if (field === 'search') {
+      sanitizedValue = sanitizeHtml(value);
+    }
+    setBookingFilters(prev => ({ ...prev, [field]: sanitizedValue }));
+  };
+
+  const handleNewUserChange = (field: keyof typeof newUser, value: string) => {
+    let sanitizedValue = value;
+    switch (field) {
+      case 'name':
+        sanitizedValue = sanitizeName(value);
+        break;
+      case 'email':
+        sanitizedValue = sanitizeEmail(value);
+        break;
+      case 'phone':
+        sanitizedValue = sanitizePhone(value);
+        break;
+      case 'password':
+        sanitizedValue = value.substring(0, 128); // Don't sanitize passwords
+        break;
+    }
+    setNewUser(prev => ({ ...prev, [field]: sanitizedValue }));
   };
 
   return (

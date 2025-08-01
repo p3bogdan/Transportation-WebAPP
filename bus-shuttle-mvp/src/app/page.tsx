@@ -7,6 +7,7 @@ import RouteList from '../components/RouteList';
 import RouteDetails from '../components/RouteDetails';
 import BookingForm from '../components/BookingForm';
 import { Route } from '../utils/types';
+import { sanitizeName, sanitizeEmail, sanitizePhone } from '../utils/sanitization';
 import './globals.css';
 
 export default function HomePage() {
@@ -142,38 +143,84 @@ export default function HomePage() {
     setModalLoading(true);
     setModalError('');
     
-    // Basic validation
-    if (!modalForm.name || !modalForm.email || !modalForm.password) {
+    // Sanitize inputs
+    const sanitizedName = sanitizeName(modalForm.name);
+    const sanitizedEmail = sanitizeEmail(modalForm.email);
+    const sanitizedPhone = sanitizePhone(modalForm.phone);
+    
+    // Basic validation with sanitized inputs
+    if (!sanitizedName || !sanitizedEmail || !modalForm.password) {
       setModalError('Please fill in all required fields');
       setModalLoading(false);
       return;
     }
 
+    if (sanitizedName.length < 2) {
+      setModalError('Name must be at least 2 characters long');
+      setModalLoading(false);
+      return;
+    }
+
+    // Validate password requirements specifically
     if (modalForm.password.length < 6) {
       setModalError('Password must be at least 6 characters long');
       setModalLoading(false);
       return;
     }
 
+    if (!/[a-z]/.test(modalForm.password)) {
+      setModalError('Password must contain at least one lowercase letter');
+      setModalLoading(false);
+      return;
+    }
+
+    if (!/[A-Z]/.test(modalForm.password)) {
+      setModalError('Password must contain at least one uppercase letter');
+      setModalLoading(false);
+      return;
+    }
+
+    if (!/\d/.test(modalForm.password)) {
+      setModalError('Password must contain at least one number');
+      setModalLoading(false);
+      return;
+    }
+
     try {
+      const registrationData = {
+        name: sanitizedName,
+        email: sanitizedEmail,
+        phone: sanitizedPhone,
+        password: modalForm.password // Don't sanitize password
+      };
+
+      console.log('Sending registration data:', { ...registrationData, password: '[HIDDEN]' });
+
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(modalForm),
+        body: JSON.stringify(registrationData),
       });
       
       const data = await res.json();
       
       if (!res.ok) {
-        throw new Error(data.error || 'Registration failed. Please try again.');
+        // Show specific password errors if available
+        if (data.details && Array.isArray(data.details)) {
+          setModalError('Password requirements: ' + data.details.join(', '));
+        } else {
+          setModalError(data.error || 'Registration failed. Please try again.');
+        }
+        setModalLoading(false);
+        return;
       }
       
       // Auto-login after successful registration
       const { signIn } = await import('next-auth/react');
       const result = await signIn('credentials', {
-        email: modalForm.email,
+        email: sanitizedEmail,
         password: modalForm.password,
         redirect: false,
       });
@@ -187,6 +234,7 @@ export default function HomePage() {
         window.location.href = '/profile';
       }
     } catch (error: any) {
+      console.error('Modal registration error:', error);
       setModalError(error.message);
     } finally {
       setModalLoading(false);
@@ -732,7 +780,7 @@ export default function HomePage() {
               />
               <input 
                 type="password" 
-                placeholder="Password (min 6 characters) *" 
+                placeholder="Password *" 
                 value={modalForm.password}
                 onChange={(e) => setModalForm({ ...modalForm, password: e.target.value })}
                 style={{ 
@@ -743,6 +791,24 @@ export default function HomePage() {
                   boxSizing: 'border-box'
                 }}
               />
+              <div style={{ 
+                fontSize: 12, 
+                color: '#666', 
+                marginTop: -8,
+                marginBottom: 8,
+                padding: '8px 12px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: 4,
+                border: '1px solid #e9ecef'
+              }}>
+                <strong>Password must contain:</strong>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: 16 }}>
+                  <li>At least 6 characters</li>
+                  <li>One lowercase letter (a-z)</li>
+                  <li>One uppercase letter (A-Z)</li>
+                  <li>One number (0-9)</li>
+                </ul>
+              </div>
             </div>
             
             <div style={{ display: 'flex', gap: 12 }}>

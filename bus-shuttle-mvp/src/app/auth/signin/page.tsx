@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { signIn, getSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { sanitizeName, sanitizeEmail, sanitizePhone, sanitizeHtml, validatePassword } from '@/utils/sanitization';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,9 +20,24 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
+    // Sanitize inputs
+    const sanitizedEmail = sanitizeEmail(email);
+    
+    if (!sanitizedEmail) {
+      setError('Valid email address is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await signIn('credentials', {
-        email,
+        email: sanitizedEmail,
         password,
         redirect: false,
       });
@@ -44,11 +60,42 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
+    // Sanitize all inputs
+    const sanitizedName = sanitizeName(name);
+    const sanitizedEmail = sanitizeEmail(email);
+    const sanitizedPhone = sanitizePhone(phone);
+
+    // Validate sanitized inputs
+    if (!sanitizedName || sanitizedName.length < 2) {
+      setError('Name must be at least 2 characters');
+      setLoading(false);
+      return;
+    }
+
+    if (!sanitizedEmail || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(sanitizedEmail)) {
+      setError('Valid email address is required');
+      setLoading(false);
+      return;
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      setError(`Password requirements: ${passwordValidation.errors.join(', ')}`);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, phone }),
+        body: JSON.stringify({ 
+          name: sanitizedName, 
+          email: sanitizedEmail, 
+          password, 
+          phone: sanitizedPhone 
+        }),
       });
 
       if (!res.ok) {
@@ -58,7 +105,7 @@ export default function LoginPage() {
 
       // Auto-login after successful registration
       const result = await signIn('credentials', {
-        email,
+        email: sanitizedEmail,
         password,
         redirect: false,
       });
@@ -69,10 +116,26 @@ export default function LoginPage() {
         router.push('/profile');
       }
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(sanitizeHtml(err.message || 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
+  };
+
+  // Input change handlers with real-time sanitization
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeName(e.target.value);
+    setName(sanitized);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeEmail(e.target.value);
+    setEmail(sanitized);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizePhone(e.target.value);
+    setPhone(sanitized);
   };
 
   return (
@@ -106,13 +169,14 @@ export default function LoginPage() {
         {isRegistering && (
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold', color: '#333' }}>
-              Full Name
+              Full Name *
             </label>
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={handleNameChange}
               required={isRegistering}
+              maxLength={60}
               placeholder="Enter your full name"
               style={{
                 width: '100%',
@@ -128,12 +192,12 @@ export default function LoginPage() {
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold', color: '#333' }}>
-            Email Address
+            Email Address *
           </label>
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={handleEmailChange}
             required
             placeholder="Enter your email"
             style={{
@@ -155,7 +219,8 @@ export default function LoginPage() {
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={handlePhoneChange}
+              maxLength={20}
               placeholder="e.g. +40712345678"
               style={{
                 width: '100%',
@@ -171,7 +236,7 @@ export default function LoginPage() {
 
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 'bold', color: '#333' }}>
-            Password
+            Password *
           </label>
           <input
             type="password"
@@ -179,6 +244,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
+            maxLength={128}
             placeholder={isRegistering ? "Create a password (min 6 characters)" : "Enter your password"}
             style={{
               width: '100%',
@@ -189,6 +255,11 @@ export default function LoginPage() {
               boxSizing: 'border-box'
             }}
           />
+          {isRegistering && (
+            <small style={{ color: '#666', fontSize: 12, display: 'block', marginTop: 4 }}>
+              Password must contain uppercase, lowercase, and numbers
+            </small>
+          )}
         </div>
 
         {error && (
@@ -220,56 +291,34 @@ export default function LoginPage() {
             marginBottom: 16
           }}
         >
-          {loading 
-            ? 'Please wait...' 
-            : (isRegistering ? 'Create Account' : 'Sign In')
-          }
+          {loading ? 'Please wait...' : (isRegistering ? 'Create Account' : 'Sign In')}
         </button>
+
+        <div style={{ textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsRegistering(!isRegistering);
+              setError('');
+              setName('');
+              setPhone('');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#1976d2',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              fontSize: 14
+            }}
+          >
+            {isRegistering 
+              ? 'Already have an account? Sign in' 
+              : "Don't have an account? Create one"
+            }
+          </button>
+        </div>
       </form>
-
-      {/* Toggle between login and register */}
-      <div style={{ textAlign: 'center', paddingTop: 16, borderTop: '1px solid #eee' }}>
-        <p style={{ margin: 0, color: '#666' }}>
-          {isRegistering ? 'Already have an account?' : "Don't have an account?"}
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            setIsRegistering(!isRegistering);
-            setError('');
-            setName('');
-            setEmail('');
-            setPassword('');
-            setPhone('');
-          }}
-          style={{
-            marginTop: 8,
-            padding: '8px 16px',
-            backgroundColor: 'transparent',
-            color: '#1976d2',
-            border: '1px solid #1976d2',
-            borderRadius: 4,
-            cursor: 'pointer',
-            fontSize: 14
-          }}
-        >
-          {isRegistering ? 'Sign In Instead' : 'Create Account'}
-        </button>
-      </div>
-
-      {/* Home link */}
-      <div style={{ textAlign: 'center', marginTop: 16 }}>
-        <a 
-          href="/"
-          style={{
-            color: '#666',
-            textDecoration: 'none',
-            fontSize: 14
-          }}
-        >
-          ← Back to Home
-        </a>
-      </div>
     </div>
   );
 }
