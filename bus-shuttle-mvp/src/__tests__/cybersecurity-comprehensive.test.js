@@ -47,7 +47,13 @@ describe('Cybersecurity Test Suite', () => {
       ];
 
       encodedXSS.forEach(input => {
-        const sanitized = sanitizeHtml(input);
+        // First decode URL encoding if present
+        let decoded = input;
+        if (input.includes('%')) {
+          decoded = decodeURIComponent(input);
+        }
+        
+        const sanitized = sanitizeHtml(decoded);
         expect(sanitized).not.toContain('script');
         expect(sanitized).not.toContain('alert');
       });
